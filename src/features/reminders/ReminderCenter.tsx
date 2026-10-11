@@ -6,7 +6,7 @@ import { getStore, type Reminder } from '@/lib/db'
 import { useList, useInvalidate } from '@/lib/db/hooks'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useAuth } from '@/auth/AuthProvider'
-import { minutesOfDay, formatTime } from '@/lib/dates'
+import { addDays, dateKey, formatTime, minutesOfDay, timeOf, zonedToInstant } from '@/lib/dates'
 import { nextOccurrence } from '@/lib/recurrence'
 import { cn } from '@/lib/utils'
 import { inQuietHours, showBrowserNotification } from './notify'
@@ -33,12 +33,12 @@ async function rollForward(r: Reminder, tz: string) {
     const h = await store.get('habits', r.source_id)
     if (h) await syncHabitReminders(h, tz)
   } else if (r.source_type === 'custom' && r.recurrence) {
+    // Custom repeating reminders keep their wall-clock time in the user's zone.
     const fired = new Date(r.remind_at)
-    const startKey = r.occurrence_key || fired.toISOString().slice(0, 10)
-    const fromKey = new Date(fired.getTime() + 86400000).toISOString().slice(0, 10)
-    const next = nextOccurrence(r.recurrence, startKey, fromKey)
+    const startKey = r.occurrence_key || dateKey(fired, tz)
+    const next = nextOccurrence(r.recurrence, startKey, addDays(dateKey(fired, tz), 1))
     if (next) {
-      const when = new Date(fired.getTime() + (Date.parse(next) - Date.parse(fired.toISOString().slice(0, 10))))
+      const when = zonedToInstant(next, timeOf(fired, tz), tz)
       try {
         await store.insert('reminders', {
           source_type: 'custom',
