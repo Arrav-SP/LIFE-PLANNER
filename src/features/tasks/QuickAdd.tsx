@@ -31,8 +31,9 @@ export function QuickAddDialog({ open, onClose }: { open: boolean; onClose: () =
   const actions = useTaskActions()
   const invalidate = useInvalidate()
 
+  // Reset after closing, so text typed right as the dialog opens is never wiped.
   useEffect(() => {
-    if (open) {
+    if (!open) {
       setText('')
       setKind('task')
     }
