@@ -1,5 +1,5 @@
 import {
-  BarChart3, BookOpen, CalendarDays, CheckSquare, Dumbbell, Flag, FolderKanban, Home, Inbox, LayoutList, Bell, Repeat, Settings, NotebookPen, Search,
+  BarChart3, BookOpen, CalendarDays, CheckSquare, Dumbbell, Flag, FolderKanban, Home, Inbox, LayoutList, Bell, Repeat, Settings, NotebookPen, Search, Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -22,6 +22,7 @@ export const NAV: NavItem[] = [
   { to: '/study', label: 'Study', icon: BookOpen, group: 'track' },
   { to: '/fitness', label: 'Fitness', icon: Dumbbell, group: 'track' },
   { to: '/analytics', label: 'Analytics', icon: BarChart3, group: 'review' },
+  { to: '/coach', label: 'Coach', icon: Sparkles, group: 'review' },
   { to: '/review', label: 'Weekly review', icon: NotebookPen, group: 'review' },
   { to: '/reminders', label: 'Reminders', icon: Bell, group: 'system' },
   { to: '/search', label: 'Search', icon: Search, group: 'system' },
