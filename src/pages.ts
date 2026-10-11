@@ -13,6 +13,7 @@ export const PAGES: { path: string; Component: ComponentType }[] = [
   { path: '/inbox', Component: named(() => import('@/features/notes/InboxPage'), 'InboxPage') },
   { path: '/reminders', Component: named(() => import('@/features/reminders/RemindersPage'), 'RemindersPage') },
   { path: '/analytics', Component: named(() => import('@/features/analytics/AnalyticsPage'), 'AnalyticsPage') },
+  { path: '/coach', Component: named(() => import('@/features/coach/CoachPage'), 'CoachPage') },
   { path: '/review', Component: named(() => import('@/features/analytics/WeeklyReviewPage'), 'WeeklyReviewPage') },
   { path: '/search', Component: named(() => import('@/features/search/SearchPage'), 'SearchPage') },
   { path: '/settings', Component: named(() => import('@/features/settings/SettingsPage'), 'SettingsPage') },
