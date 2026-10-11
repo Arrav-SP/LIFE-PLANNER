@@ -1,35 +1,79 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Suspense, type ReactNode } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider, useAuth } from '@/auth/AuthProvider'
+import { LoginPage, ResetPasswordPage } from '@/auth/LoginPage'
+import { SettingsProvider } from '@/settings/SettingsProvider'
+import { AppShell } from '@/components/layout/AppShell'
+import { Toaster } from '@/components/ui/toast'
+import { ConfirmHost } from '@/components/ui/Dialog'
+import { ListSkeleton } from '@/components/ui/misc'
+import { useReminderEngine } from '@/features/reminders/ReminderCenter'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { PAGES } from './pages'
 
-function App() {
-  const [count, setCount] = useState(0)
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 },
+    mutations: { retry: 0 },
+  },
+})
 
+function Engine() {
+  useReminderEngine()
+  return null
+}
+
+function Gate({ children }: { children: ReactNode }) {
+  const { ready, user } = useAuth()
+  if (!ready)
+    return (
+      <div className="mx-auto max-w-md p-10">
+        <ListSkeleton rows={3} />
+      </div>
+    )
+  if (!user) return <LoginPage />
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <SettingsProvider>
+      <Engine />
+      {children}
+    </SettingsProvider>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route
+              path="*"
+              element={
+                <Gate>
+                  <AppShell>
+                    <ErrorBoundary>
+                      <Suspense fallback={<ListSkeleton rows={5} />}>
+                        <Routes>
+                          {PAGES.map((p) => (
+                            <Route key={p.path} path={p.path} element={<p.Component />} />
+                          ))}
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                      </Suspense>
+                    </ErrorBoundary>
+                  </AppShell>
+                </Gate>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+        <Toaster />
+        <ConfirmHost />
+      </AuthProvider>
+    </QueryClientProvider>
+  )
+}
+
+
