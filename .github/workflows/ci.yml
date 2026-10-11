@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Free GitHub Actions minutes only; no paid runners or services.
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Database security tests
+        run: PG_BIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1) npm run test:db
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --project=desktop --project=mobile
+        env:
+          CI: true
