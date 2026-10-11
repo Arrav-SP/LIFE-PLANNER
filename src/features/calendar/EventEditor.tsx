@@ -55,9 +55,20 @@ export interface EditorTarget {
   start?: Date
   end?: Date
   allDay?: boolean
+  title?: string
 }
 
-export function EventEditor({ target, onClose, busy }: { target: EditorTarget | null; onClose: () => void; busy: { key: string; title: string; start: Date; end: Date; allDay: boolean }[] }) {
+export function EventEditor({
+  target,
+  onClose,
+  busy,
+  onSaved,
+}: {
+  target: EditorTarget | null
+  onClose: () => void
+  busy: { key: string; title: string; start: Date; end: Date; allDay: boolean }[]
+  onSaved?: (ev: CalendarEvent) => void
+}) {
   const { tz, settings } = useSettings()
   const lookups = useLookups()
   const actions = useEventActions()
@@ -72,7 +83,7 @@ export function EventEditor({ target, onClose, busy }: { target: EditorTarget | 
     // All-day ends are exclusive midnights; show the inclusive last day.
     const endKey = allDay ? addDays(dateKey(end, tz), dateKey(end, tz) > dateKey(start, tz) ? -1 : 0) : dateKey(end, tz)
     return {
-      title: (oneOnly && inst ? inst.title : ev?.title) ?? '',
+      title: (oneOnly && inst ? inst.title : ev?.title) ?? target?.title ?? '',
       all_day: allDay,
       start_date: dateKey(start, tz),
       start_time: allDay ? '' : timeOf(start, tz),
@@ -143,7 +154,9 @@ export function EventEditor({ target, onClose, busy }: { target: EditorTarget | 
         recurrence: f.recurrence,
         reminder_offsets: f.reminder_offsets,
       }
-      ok = ev ? await actions.update(ev, { ...values, timezone: ev.timezone || tz }) : await actions.create(values)
+      const saved = ev ? await actions.update(ev, { ...values, timezone: ev.timezone || tz }) : await actions.create(values)
+      if (saved) onSaved?.(saved)
+      ok = saved
     }
     if (ok !== null) onClose()
   })
