@@ -1,68 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Layout: fixed sidebar on desktop, compact top bar + bottom tab bar on phones.
+   Palette: warm paper neutrals with a deep teal accent; ink-dark theme mirrors it. */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --bg: 246 246 243;
+  --surface: 255 255 255;
+  --surface-2: 240 240 236;
+  --line: 226 226 220;
+  --fg: 24 27 31;
+  --muted: 92 98 106;
+  --subtle: 140 146 154;
+  --accent: 15 118 110;
+  --accent-fg: 255 255 255;
+  --accent-soft: 214 238 234;
+  --success: 22 128 61;
+  --warning: 180 110 8;
+  --danger: 200 40 40;
+  color-scheme: light;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+:root.dark {
+  --bg: 15 17 20;
+  --surface: 23 26 30;
+  --surface-2: 32 36 41;
+  --line: 45 50 57;
+  --fg: 232 234 237;
+  --muted: 160 166 174;
+  --subtle: 115 122 131;
+  --accent: 61 199 182;
+  --accent-fg: 6 30 27;
+  --accent-soft: 22 58 54;
+  --success: 74 200 120;
+  --warning: 230 170 60;
+  --danger: 240 100 100;
+  color-scheme: dark;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    font-size: 15px;
+    -webkit-tap-highlight-color: transparent;
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+  h1, h2, h3 { text-wrap: balance; }
+  :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
+  input, select, textarea { font-size: 16px; }
+  @media (min-width: 768px) { input, select, textarea { font-size: 14px; } }
+  .tabular { font-variant-numeric: tabular-nums; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* FullCalendar theming through the same tokens */
+.fc {
+  --fc-border-color: rgb(var(--line));
+  --fc-page-bg-color: rgb(var(--surface));
+  --fc-neutral-bg-color: rgb(var(--surface-2));
+  --fc-today-bg-color: rgb(var(--accent-soft) / 0.5);
+  --fc-now-indicator-color: rgb(var(--danger));
+  --fc-event-border-color: transparent;
+  --fc-list-event-hover-bg-color: rgb(var(--surface-2));
+  font-size: 13px;
+}
+.fc .fc-toolbar-title { font-size: 1.05rem; font-weight: 600; }
+.fc .fc-button { @apply rounded-lg border-line bg-surface text-fg shadow-none text-sm capitalize; }
+.fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active { @apply bg-accent text-accent-fg border-accent; }
+.fc .fc-button:focus { box-shadow: none; }
+.fc .fc-col-header-cell-cushion, .fc .fc-daygrid-day-number { @apply text-muted; }
+.fc .fc-event { cursor: pointer; }
+.fc-theme-standard .fc-list-day-cushion { background: rgb(var(--surface-2)); }

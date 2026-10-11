@@ -290,7 +290,7 @@ export class LocalStore implements DataStore {
     const base: Record<string, unknown> = { ...clone(DEFAULTS[table] ?? {}) }
     const row: Record<string, unknown> = {
       ...base,
-      ...clone(values as Record<string, unknown>),
+      ...clone(values as unknown as Record<string, unknown>),
       user_id: this.userId,
       created_at: now,
       updated_at: now,
@@ -309,8 +309,8 @@ export class LocalStore implements DataStore {
     for (const cols of groups) {
       const clash = rows.find(
         (r) =>
-          (r as Record<string, unknown>)[pk] !== (row as Record<string, unknown>)[pk] &&
-          cols.every((c) => (r as Record<string, unknown>)[c] === (row as Record<string, unknown>)[c]),
+          (r as unknown as Record<string, unknown>)[pk] !== (row as unknown as Record<string, unknown>)[pk] &&
+          cols.every((c) => (r as unknown as Record<string, unknown>)[c] === (row as unknown as Record<string, unknown>)[c]),
       )
       if (clash) throw new StoreError(`A ${table.replace(/_/g, ' ')} entry with the same ${cols.join(' and ')} already exists.`, '23505')
     }
@@ -333,7 +333,7 @@ export class LocalStore implements DataStore {
   async update<T extends TableName>(table: T, id: string, patch: Patch<T>): Promise<Row<T>> {
     const existing = await this.get(table, id)
     if (!existing) throw new StoreError('That record no longer exists.', 'PGRST116')
-    const clean = clone(patch as Record<string, unknown>)
+    const clean = clone(patch as unknown as Record<string, unknown>)
     for (const k of ['id', 'user_id', 'created_at', 'updated_at']) delete clean[k]
     for (const k of Object.keys(clean)) if (clean[k] === undefined) delete clean[k]
     const row = { ...existing, ...clean, updated_at: new Date().toISOString() } as Row<T>
@@ -346,10 +346,10 @@ export class LocalStore implements DataStore {
   async upsert<T extends TableName>(table: T, values: Insert<T>, onConflict: (keyof Row<T> & string)[]): Promise<Row<T>> {
     const rows = await this.all(table)
     const v = values as Record<string, unknown>
-    const match = rows.find((r) => onConflict.every((c) => (r as Record<string, unknown>)[c] === v[c]))
+    const match = rows.find((r) => onConflict.every((c) => (r as unknown as Record<string, unknown>)[c] === v[c]))
     if (match) {
       const pk = primaryKey(table)
-      return this.update(table, (match as Record<string, unknown>)[pk] as string, values as Patch<T>)
+      return this.update(table, (match as unknown as Record<string, unknown>)[pk] as string, values as Patch<T>)
     }
     return this.insert(table, values)
   }
@@ -378,8 +378,8 @@ export class LocalStore implements DataStore {
     const rows = await this.all(table)
     const pk = primaryKey(table)
     for (const r of rows) {
-      if (filters.every((f) => matchesFilter(r as Record<string, unknown>, f))) {
-        await this.remove(table, (r as Record<string, unknown>)[pk] as string)
+      if (filters.every((f) => matchesFilter(r as unknown as Record<string, unknown>, f))) {
+        await this.remove(table, (r as unknown as Record<string, unknown>)[pk] as string)
       }
     }
   }
@@ -389,7 +389,7 @@ export class LocalStore implements DataStore {
     for (const t of TABLES) {
       const rows = await this.all(t)
       const pk = primaryKey(t)
-      for (const r of rows) await db.delete(t, (r as Record<string, unknown>)[pk] as string)
+      for (const r of rows) await db.delete(t, (r as unknown as Record<string, unknown>)[pk] as string)
     }
   }
 
