@@ -17,10 +17,20 @@ begin
 end $$;
 
 -- Ownership always comes from the session, never from the client payload.
+-- Server-side jobs (the optional push function uses the service role) may
+-- write rows for a given user; browsers always act as themselves.
+create or replace function public.is_trusted_role() returns boolean
+language sql stable as $$
+  select coalesce(auth.role(), '') = 'service_role' or current_user in ('postgres', 'supabase_admin', 'service_role')
+$$;
+
 create or replace function public.force_user_id() returns trigger
 language plpgsql as $$
 begin
   if auth.uid() is null then
+    if public.is_trusted_role() and new.user_id is not null then
+      return new;
+    end if;
     raise exception 'not authenticated' using errcode = '42501';
   end if;
   if tg_op = 'INSERT' then
@@ -576,6 +586,10 @@ declare
   owner uuid;
 begin
   if row_id is null then
+    return;
+  end if;
+  -- Trusted server roles are checked by force_user_id instead.
+  if auth.uid() is null and public.is_trusted_role() then
     return;
   end if;
   execute format('select user_id from %s where id = $1', tbl) into owner using row_id;
