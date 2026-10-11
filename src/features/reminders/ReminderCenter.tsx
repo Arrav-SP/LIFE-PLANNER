@@ -107,6 +107,9 @@ export function useReminderEngine() {
       if (stale) {
         status = 'suppressed'
         detail = 'Missed while the app was closed'
+      } else if (r.source_type === 'habit' && prefs.habit_reminders === false) {
+        status = 'suppressed'
+        detail = 'Habit reminders are turned off'
       } else if (quiet) {
         status = 'suppressed'
         detail = 'Quiet hours'
