@@ -18,6 +18,7 @@ It costs nothing to run. Every service below is used on its free tier, and none 
 | **Study** | Subjects with topics and weekly targets. The focus timer and pomodoro are based on timestamps, so they stay correct if the tab sleeps or the phone locks. Sessions can also be logged by hand. |
 | **Fitness** | Workouts with sets, reps, weight or time, workout templates, personal records with estimated 1RM, and body measurements with a chart. |
 | **Inbox and notes** | Capture anything, then turn it into a task, an event or a reminder. |
+| **Coach** | Ranks the ideal tasks for today against your free time, works out a study pace per subject from its goal deadline and your recent study, and points out what to change (overbooked days, overdue piles, slipping habits, goals behind, your best focus hours). It is plain arithmetic in the app with no AI service. "Copy for Claude" copies a summary you can paste into a chat for deeper advice. |
 | **Reminders** | In-app reminders, browser notifications while the app is open, and optional Web Push that works while the app is closed (see below). Quiet hours are respected. |
 | **Analytics and weekly review** | Charts for completed tasks, study hours, study by subject, habit consistency and goals. The weekly review records wins, misses and next week's priorities. |
 | **Everything else** | Search, keyboard shortcuts, light and dark themes, JSON and CSV export, JSON import, and account deletion. |
