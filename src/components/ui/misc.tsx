@@ -68,8 +68,9 @@ export function Badge({ children, color, className }: { children: ReactNode; col
   )
 }
 
+/** `value` is a ratio from 0 to 1. */
 export function ProgressBar({ value, color, className, label }: { value: number; color?: string; className?: string; label?: string }) {
-  const v = Math.max(0, Math.min(100, Math.round(value)))
+  const v = Math.max(0, Math.min(100, Math.round((Number.isFinite(value) ? value : 0) * 100)))
   return (
     <div className={cn('h-1.5 w-full overflow-hidden rounded-full bg-surface-2', className)} role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
       <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${v}%`, backgroundColor: color }} />
