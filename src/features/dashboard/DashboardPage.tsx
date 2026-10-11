@@ -155,7 +155,7 @@ export function DashboardPage() {
               return (
                 <li key={s.key} className={cn('flex items-start gap-3 rounded-lg px-2 py-1.5', current && 'bg-accent-soft/60')}>
                   <span className="w-[4.5rem] shrink-0 pt-0.5 text-xs tabular text-muted">{s.allDay ? 'All day' : formatTime(s.start, tz, settings.time_format)}</span>
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: s.color ?? (s.kind === 'task' ? 'rgb(var(--accent))' : s.kind === 'block' ? 'rgb(var(--warning))' : 'rgb(var(--muted))') }} aria-hidden />
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: s.color ?? (s.kind === 'task' ? 'rgb(var(--accent))' : s.kind === 'block' ? 'rgb(var(--warning))' : 'rgb(var(--accent))') }} aria-hidden />
                   <span className="min-w-0 flex-1">
                     <span className={cn('block truncate text-sm', s.done && 'text-muted line-through')}>{s.title}</span>
                     {!s.allDay && (
@@ -303,10 +303,20 @@ export function DashboardPage() {
 
       {dueToday.length > 0 && <ProgressBar value={doneToday / dueToday.length} className="mb-6" label="Today's progress" />}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Two independent columns so tall sections never leave gaps. */}
+      <div className="flex flex-col gap-4 lg:hidden">
         {visible.map((id) => (
-          <div key={id} className={cn(id === 'today' && 'lg:row-span-2')}>
-            {sections[id]}
+          <div key={id}>{sections[id]}</div>
+        ))}
+      </div>
+      <div className="hidden gap-4 lg:grid lg:grid-cols-2">
+        {[0, 1].map((col) => (
+          <div key={col} className="flex min-w-0 flex-col gap-4">
+            {visible
+              .filter((_, i) => i % 2 === col)
+              .map((id) => (
+                <div key={id}>{sections[id]}</div>
+              ))}
           </div>
         ))}
       </div>
