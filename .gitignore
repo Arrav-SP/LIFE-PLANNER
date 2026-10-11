@@ -37,3 +37,4 @@ playwright-report
 blob-report
 scripts/.shot.mjs
 scripts/.smoke.mjs
+scripts/.shots2.mjs
