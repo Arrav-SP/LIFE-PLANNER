@@ -15,6 +15,7 @@ export const PAGES: { path: string; Component: ComponentType }[] = [
   { path: '/analytics', Component: named(() => import('@/features/analytics/AnalyticsPage'), 'AnalyticsPage') },
   { path: '/review', Component: named(() => import('@/features/analytics/WeeklyReviewPage'), 'WeeklyReviewPage') },
   { path: '/search', Component: named(() => import('@/features/search/SearchPage'), 'SearchPage') },
+  { path: '/settings', Component: named(() => import('@/features/settings/SettingsPage'), 'SettingsPage') },
   { path: '/habits', Component: named(() => import('@/features/habits/HabitsPage'), 'HabitsPage') },
   { path: '/goals', Component: named(() => import('@/features/goals/GoalsPage'), 'GoalsPage') },
   { path: '/projects', Component: named(() => import('@/features/goals/ProjectsPage'), 'ProjectsPage') },
