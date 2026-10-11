@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
 import { QuickAddDialog } from '@/features/tasks/QuickAdd'
 import { ReminderCenter } from '@/features/reminders/ReminderCenter'
+import { InstallButton } from '@/features/install/InstallButton'
 
 const GROUP_LABEL: Record<string, string> = { main: '', track: 'Track', review: 'Review', system: '' }
 
@@ -99,6 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Plus className="h-4 w-4" aria-hidden /> Quick add
           <kbd className="ml-auto rounded bg-white/20 px-1.5 text-[11px]">Q</kbd>
         </button>
+        <InstallButton variant="sidebar" />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <SideNav />
         </div>
@@ -112,6 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <CalendarCheck2 className="h-4 w-4" aria-hidden />
           </span>
           <span className="flex-1 font-semibold">Life Planner</span>
+          <InstallButton variant="icon" />
           <ReminderCenter compact />
           <button aria-label="Search" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-2" onClick={() => navigate('/search')}>
             <Search className="h-5 w-5" />
