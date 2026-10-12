@@ -49,8 +49,20 @@ export interface UserSettings {
   notifications: NotificationPrefs
   dashboard: DashboardPrefs
   onboarded_at: Instant | null
+  /** Secret part of the calendar feed URL (needs the calendar_links migration). */
+  calendar_feed_token?: string | null
+  /** Other calendars shown read-only in the app (needs the calendar_links migration). */
+  calendar_links?: CalendarLinkSetting[]
   created_at: Instant
   updated_at: Instant
+}
+
+export interface CalendarLinkSetting {
+  id: string
+  name: string
+  url: string
+  color: string
+  enabled: boolean
 }
 
 export interface NotificationPrefs {

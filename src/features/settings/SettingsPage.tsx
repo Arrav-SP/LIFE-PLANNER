@@ -16,6 +16,7 @@ import { toast } from '@/components/ui/toast'
 import { REMINDER_CHOICES } from '@/features/tasks/TaskEditor'
 import { notificationPermission, requestNotificationPermission } from '@/features/reminders/notify'
 import { download, exportAll, importAll, toCSV } from '@/lib/export'
+import { CalendarLinksPanel } from '@/features/calendar/CalendarLinksPanel'
 import { currentSubscription, pushAvailable, subscribePush, unsubscribePush } from '@/lib/push'
 
 const ZONES: string[] = (() => {
@@ -151,6 +152,7 @@ export function SettingsPage() {
         </div>
       </Panel>
 
+      <CalendarLinksPanel />
       <CategoriesPanel />
       <DataPanel />
 
