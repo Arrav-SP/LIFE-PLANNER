@@ -99,6 +99,21 @@ Browser timers stop when the app is closed, so in-app and browser reminders only
 5. Open `supabase/optional/push_cron.sql`, replace `YOUR-PROJECT-REF` and `YOUR-CRON-SECRET`, and run it in the SQL Editor. Don't commit the edited file.
 6. In the app, go to Settings → Notifications and turn on push for this device.
 
+## 6. Optional: Google Calendar
+
+Two one-way links, both free and without a Google Cloud account:
+
+- **Your plans in Google Calendar.** The app publishes your events and dated tasks as a calendar feed. Google Calendar subscribes to it ("Other calendars → From URL") and refreshes it on its own schedule, usually every few hours.
+- **Google Calendar in the app.** Paste a calendar's "Secret address in iCal format" and its events show read-only in the app's Calendar.
+
+Setup, once:
+
+1. In the SQL Editor, run `supabase/migrations/20261013000000_calendar_links.sql`.
+2. Create an Edge Function named `calendar` (dashboard: Edge Functions → Deploy a new function → Via Editor), paste the whole of `supabase/functions/calendar/index.ts`, deploy, and turn off **Verify JWT** in its settings. With the CLI: `npx supabase functions deploy calendar --no-verify-jwt`. Optionally set the secret `APP_URL` to your app's address so feed entries link back to it.
+3. In the app, open Settings → Google Calendar.
+
+Real-time two-way sync would need Google's Calendar API and a Google Cloud project, so it isn't used.
+
 ## Free-tier limits worth knowing
 
 - **Supabase Free:** 500 MB database, 50,000 monthly active users, 500,000 Edge Function calls a month, and 2 free projects. **A Free project pauses after 7 days without activity.** Opening the app counts as activity. If it does pause, press Restore in the dashboard; your data is kept.
