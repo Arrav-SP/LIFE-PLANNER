@@ -7,6 +7,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { QuickAddDialog } from '@/features/tasks/QuickAdd'
 import { ReminderCenter } from '@/features/reminders/ReminderCenter'
 import { InstallButton } from '@/features/install/InstallButton'
+import { SyncBanner } from '@/features/offline/OfflineSync'
 
 const GROUP_LABEL: Record<string, string> = { main: '', track: 'Track', review: 'Review', system: '' }
 
@@ -123,6 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="hidden justify-end px-8 pt-4 md:flex">
           <ReminderCenter />
         </div>
+        <SyncBanner />
         {mode === 'local' && (
           <div className="mx-4 mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-fg md:mx-8">
             Local mode: data is saved in this browser only. Add your Supabase keys to sync across devices (see the README).

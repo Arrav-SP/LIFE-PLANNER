@@ -384,6 +384,35 @@ export class LocalStore implements DataStore {
     }
   }
 
+  /** Store rows exactly as given (already owned by this user), replacing any with the same key. */
+  async putRaw<T extends TableName>(table: T, rows: Row<T>[]): Promise<void> {
+    if (!rows.length) return
+    const db = await this.dbPromise
+    const tx = db.transaction(table, 'readwrite')
+    for (const r of rows) if ((r as { user_id: string }).user_id === this.userId) void tx.store.put(clone(r))
+    await tx.done
+  }
+
+  /** Delete one row without cascading (the server already applied its own cascades). */
+  async deleteRaw<T extends TableName>(table: T, id: string): Promise<void> {
+    if (!(await this.get(table, id))) return
+    const db = await this.dbPromise
+    await db.delete(table, id)
+  }
+
+  /** Make this user's copy of a table exactly `rows`. */
+  async replaceTable<T extends TableName>(table: T, rows: Row<T>[]): Promise<void> {
+    const db = await this.dbPromise
+    const pk = primaryKey(table)
+    const tx = db.transaction(table, 'readwrite')
+    const keep = new Set(rows.map((r) => (r as unknown as Record<string, unknown>)[pk]))
+    for (const r of (await tx.store.getAll()) as Record<string, unknown>[]) {
+      if (r.user_id === this.userId && !keep.has(r[pk])) void tx.store.delete(r[pk] as string)
+    }
+    for (const r of rows) if ((r as { user_id: string }).user_id === this.userId) void tx.store.put(clone(r))
+    await tx.done
+  }
+
   async clearAll(): Promise<void> {
     const db = await this.dbPromise
     for (const t of TABLES) {

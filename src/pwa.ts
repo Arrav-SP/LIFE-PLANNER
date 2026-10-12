@@ -10,7 +10,7 @@ export function registerServiceWorker() {
           toast.info('A new version is ready.', { label: 'Reload', onClick: () => void update(true) })
         },
         onOfflineReady() {
-          toast.success('Ready to work offline for viewing.')
+          toast.success('Ready to work offline.')
         },
       })
     })
