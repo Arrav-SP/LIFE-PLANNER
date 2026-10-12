@@ -24,6 +24,6 @@ jobs:
       - name: Database security tests
         run: PG_BIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1) npm run test:db
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --project=desktop --project=mobile
+      - run: npm run test:e2e -- --project=desktop --project=mobile --project=offline
         env:
           CI: true
