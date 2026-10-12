@@ -337,6 +337,20 @@ function timedOccurrences(rec, startAt, endAt, tz, rangeStart, rangeEnd) {
   return out;
 }
 
+// src/lib/links.ts
+var linkTo = {
+  task: (id) => `/tasks?view=all&task=${id}`,
+  event: (id) => `/calendar?event=${id}`,
+  calendarDay: (date) => `/calendar?date=${date}`,
+  planner: (date, mode = "day") => `/planner?date=${date}&mode=${mode}`,
+  goal: (id) => `/goals?goal=${id}`,
+  project: (id) => `/projects?project=${id}`,
+  habit: (id) => `/habits?habit=${id}`,
+  subject: (id) => `/study?subject=${id}`,
+  note: (id) => `/inbox?note=${id}`,
+  week: (weekStart) => `/review?week=${weekStart}`
+};
+
 // src/features/tasks/logic.ts
 function seriesStart(t, tz) {
   return t.start_date ?? t.due_date ?? (t.scheduled_at ? dateKey(t.scheduled_at, tz) : dateKey(t.created_at, tz));
@@ -448,7 +462,7 @@ function planHabitReminders(h, tz, now = Date.now()) {
         occurrence_key: d,
         title: h.name,
         body: "Time for your habit",
-        url: "/habits",
+        url: linkTo.habit(h.id),
         remind_at: at.toISOString(),
         offset_minutes: 0,
         dedupe_key: `habit:${h.id}:${d}`

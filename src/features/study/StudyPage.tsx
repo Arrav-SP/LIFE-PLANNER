@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { BookOpen, Pause, Pencil, Play, Plus, Square, Timer, Trash2, X } from 'lucide-react'
+import { BookOpen, Pause, Pencil, Play, Plus, Square, Target, Timer, Trash2, X } from 'lucide-react'
 import { useSettings, useMinuteTick } from '@/settings/SettingsProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
 import { gte } from '@/lib/db/store'
@@ -17,6 +18,8 @@ import { Menu } from '@/components/ui/Menu'
 import { ColorDot, EmptyState, PageHeader, Panel, ProgressBar, Segmented, Stat } from '@/components/ui/misc'
 import { toast } from '@/components/ui/toast'
 import { useLookups } from '@/lib/lookups'
+import { linkTo } from '@/lib/links'
+import { useScrollIntoView } from '@/lib/useScrollIntoView'
 import { showBrowserNotification } from '@/features/reminders/notify'
 import type { StudySession, StudyTopic, Subject } from '@/lib/db/types'
 import { activeMs, clock, focusMinutes, loadTimer, pause, pomodoro, resume, saveTimer, type TimerState } from './timer'
@@ -30,7 +33,15 @@ export function StudyPage() {
   const since = zonedToInstant(addDays(weekStart, -28), '00:00', tz).toISOString()
   const sessions = useList('study_sessions', { filters: [gte('started_at', since)], order: [{ field: 'started_at', ascending: false }] })
   const [editing, setEditing] = useState<Subject | null | 'new'>(null)
-  const [selected, setSelected] = useState<string | null>(null)
+  // The open subject lives in the address (/study?subject=<id>) so other pages can link to it.
+  const [params, setParams] = useSearchParams()
+  const selected = params.get('subject')
+  const setSelected = (id: string | null) => {
+    const next = new URLSearchParams(params)
+    if (id) next.set('subject', id)
+    else next.delete('subject')
+    setParams(next, { replace: true })
+  }
   const [logOpen, setLogOpen] = useState(false)
 
   const active = (subjects.data ?? []).filter((s) => !s.archived_at)
@@ -40,6 +51,7 @@ export function StudyPage() {
   const todayMin = minutesOf(done.filter((s) => dateKey(s.started_at, tz) === today))
   const weekMin = minutesOf(done.filter((s) => Date.parse(s.started_at) >= weekStartInstant))
   const sel = active.find((s) => s.id === selected) ?? null
+  useScrollIntoView(sel ? 'subject-detail' : null, !!sel)
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -406,9 +418,11 @@ function SubjectDetail({ subject, topics, onEdit, onClose }: { subject: Subject;
       setTitle('')
     })
   const doneCount = topics.filter((t) => t.status === 'done').length
+  const goal = useLookups().goal(subject.goal_id)
 
   return (
     <Panel
+      id="subject-detail"
       title={
         <span className="flex items-center gap-2">
           <ColorDot color={subject.color} /> {subject.name}
@@ -425,6 +439,11 @@ function SubjectDetail({ subject, topics, onEdit, onClose }: { subject: Subject;
         </div>
       }
     >
+      {goal && (
+        <Link to={linkTo.goal(goal.id)} className="mb-2 inline-flex items-center gap-1 text-xs text-accent hover:underline">
+          <Target className="h-3 w-3" aria-hidden /> {goal.title}
+        </Link>
+      )}
       {subject.description && <p className="mb-3 whitespace-pre-wrap text-sm text-muted">{subject.description}</p>}
       {topics.length > 0 && (
         <>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, CalendarClock, Check, ChevronLeft, ChevronRight, Clock, Plus, Repeat, Wand2, X } from 'lucide-react'
 import { useSettings, useMinuteTick } from '@/settings/SettingsProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
@@ -7,6 +7,7 @@ import { gte, isNull } from '@/lib/db/store'
 import { getStore } from '@/lib/db'
 import { addDays, dateKey, daysInRange, formatKey, formatTime, relativeDay, startOfWeek, timeOf, zonedToInstant } from '@/lib/dates'
 import { cn, errorMessage, formatMinutes } from '@/lib/utils'
+import { linkTo } from '@/lib/links'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Field'
 import { EmptyState, Panel, Segmented } from '@/components/ui/misc'
@@ -34,6 +35,7 @@ interface Item {
   done: boolean
   block?: TimeBlock & { virtual: boolean }
   task?: TaskInstance
+  eventId?: string
   allDay?: boolean
 }
 
@@ -67,7 +69,7 @@ export function PlannerPage() {
   const items: Item[] = useMemo(() => {
     const out: Item[] = []
     for (const e of expandEvents(events.data ?? [], exceptions.data ?? [], rangeStart, rangeEnd, tz))
-      out.push({ key: e.key, title: e.title, start: e.start, end: e.end, kind: 'event', color: e.color, done: false, allDay: e.allDay })
+      out.push({ key: e.key, title: e.title, start: e.start, end: e.end, kind: 'event', color: e.color, done: false, allDay: e.allDay, eventId: e.event.id })
     for (const b of expandBlocks(blocks.data ?? [], rangeStart, rangeEnd, tz))
       out.push({ key: b.instanceKey, title: b.title, start: b.start, end: b.end, kind: 'block', color: b.color, done: b.status === 'done', block: b })
     for (const i of instances) {
@@ -120,6 +122,8 @@ export function PlannerPage() {
           days={days}
           items={items}
           instances={instances}
+          onBlock={setBlockTarget}
+          onTask={setOpenTask}
           onDay={(d) => {
             params.set('date', d)
             params.set('mode', 'day')
@@ -150,6 +154,7 @@ function DayPlan({
   onTask: (i: TaskInstance) => void
 }) {
   const { tz, today, settings } = useSettings()
+  const navigate = useNavigate()
   const { occurrences } = useTaskData()
   const taskActions = useTaskActions()
   const habitActions = useHabitActions()
@@ -282,7 +287,7 @@ function DayPlan({
                   <button
                     type="button"
                     className={cn('min-w-0 flex-1 truncate text-left font-medium', it.done && 'line-through')}
-                    onClick={() => (it.task ? onTask(it.task) : it.block ? onBlock({ block: it.block }) : undefined)}
+                    onClick={() => (it.task ? onTask(it.task) : it.block ? onBlock({ block: it.block }) : it.eventId ? navigate(linkTo.event(it.eventId)) : undefined)}
                   >
                     {it.block?.recurrence && <Repeat className="mr-1 inline h-3 w-3" aria-label="Routine" />}
                     {it.title}
@@ -402,7 +407,9 @@ function DayPlan({
                 return (
                   <li key={h.id} className="flex items-center gap-3 text-sm">
                     <Checkbox round checked={done} label={`Check in ${h.name}`} disabled={date > today} onChange={() => void habitActions.toggle(h, date, c)} />
-                    <span className="min-w-0 flex-1 truncate">{h.name}</span>
+                    <Link to={linkTo.habit(h.id)} className="min-w-0 flex-1 truncate hover:underline">
+                      {h.name}
+                    </Link>
                     {h.reminder_time && <span className="text-xs text-muted">{h.reminder_time.slice(0, 5)}</span>}
                   </li>
                 )
@@ -415,8 +422,9 @@ function DayPlan({
   )
 }
 
-function WeekPlan({ days, items, instances, onDay }: { days: DateKey[]; items: Item[]; instances: TaskInstance[]; onDay: (d: DateKey) => void }) {
+function WeekPlan({ days, items, instances, onDay, onBlock, onTask }: { days: DateKey[]; items: Item[]; instances: TaskInstance[]; onDay: (d: DateKey) => void; onBlock: (t: BlockTarget) => void; onTask: (i: TaskInstance) => void }) {
   const { tz, today, settings } = useSettings()
+  const navigate = useNavigate()
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
       {days.map((d) => {
@@ -437,15 +445,24 @@ function WeekPlan({ days, items, instances, onDay }: { days: DateKey[]; items: I
             </button>
             <ul className="flex flex-col gap-1 p-2 text-xs">
               {dayItems.map((i) => (
-                <li key={i.key} className={cn('truncate rounded-md border-l-2 bg-surface-2 px-2 py-1', i.done && 'line-through opacity-60')} style={{ borderLeftColor: i.color ?? 'rgb(var(--accent))' }}>
-                  {!i.allDay && <span className="tabular text-muted">{formatTime(i.start, tz, settings.time_format)} </span>}
-                  {i.title}
+                <li key={i.key}>
+                  <button
+                    type="button"
+                    className={cn('w-full truncate rounded-md border-l-2 bg-surface-2 px-2 py-1 text-left', i.done && 'line-through opacity-60')}
+                    style={{ borderLeftColor: i.color ?? 'rgb(var(--accent))' }}
+                    onClick={() => (i.task ? onTask(i.task) : i.block ? onBlock({ block: i.block }) : i.eventId ? navigate(linkTo.event(i.eventId)) : onDay(d))}
+                  >
+                    {!i.allDay && <span className="tabular text-muted">{formatTime(i.start, tz, settings.time_format)} </span>}
+                    {i.title}
+                  </button>
                 </li>
               ))}
               {dayTasks.map((i) => (
-                <li key={i.key} className={cn('flex items-center gap-1 truncate px-1 py-0.5', i.done && 'text-muted line-through')}>
-                  <CalendarClock className="h-3 w-3 shrink-0 text-subtle" aria-hidden />
-                  <span className="truncate">{i.task.title}</span>
+                <li key={i.key}>
+                  <button type="button" onClick={() => onTask(i)} className={cn('flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-surface-2', i.done && 'text-muted line-through')}>
+                    <CalendarClock className="h-3 w-3 shrink-0 text-subtle" aria-hidden />
+                    <span className="truncate">{i.task.title}</span>
+                  </button>
                 </li>
               ))}
               {dayItems.length + dayTasks.length === 0 && <li className="px-1 py-2 text-subtle">Nothing planned</li>}

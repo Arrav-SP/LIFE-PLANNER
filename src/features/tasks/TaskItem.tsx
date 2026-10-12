@@ -1,4 +1,5 @@
-import { CalendarClock, Copy, Archive, ArchiveRestore, Trash2, Repeat, Pencil, SkipForward, CalendarPlus, Flag, ListChecks, AlarmClock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CalendarClock, Copy, Archive, ArchiveRestore, Trash2, Repeat, Pencil, SkipForward, CalendarPlus, Flag, ListChecks, AlarmClock, FolderKanban, Target } from 'lucide-react'
 import type { TaskInstance } from './logic'
 import { checklistProgress, PRIORITY_COLOR } from './logic'
 import { Checkbox } from '@/components/ui/Field'
@@ -6,6 +7,7 @@ import { Menu } from '@/components/ui/Menu'
 import { ColorDot } from '@/components/ui/misc'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useLookups } from '@/lib/lookups'
+import { linkTo } from '@/lib/links'
 import { formatTime, relativeDay, addDays } from '@/lib/dates'
 import { cn, formatMinutes } from '@/lib/utils'
 import { useTaskActions } from './actions'
@@ -26,11 +28,13 @@ export function TaskItem({
   showDate?: boolean
 }) {
   const { tz, today, settings } = useSettings()
-  const { project, category } = useLookups()
+  const { project, category, goal: goalOf } = useLookups()
   const actions = useTaskActions()
+  const navigate = useNavigate()
   const t = item.task
   const proj = project(t.project_id)
   const cat = category(t.category_id)
+  const goal = goalOf(t.goal_id)
   const cl = checklistProgress(t)
   const overdue = !item.done && item.date !== null && item.date < today
   const archived = !!t.archived_at
@@ -104,6 +108,8 @@ export function TaskItem({
             { label: 'Tomorrow', icon: <CalendarPlus className="h-4 w-4" />, onSelect: () => void actions.reschedule(item, addDays(today, 1)), hidden: item.done },
             { label: 'Postpone a week', icon: <CalendarClock className="h-4 w-4" />, onSelect: () => void actions.postpone(item, 7, today), hidden: item.done },
             { label: 'Skip this time', icon: <SkipForward className="h-4 w-4" />, onSelect: () => void actions.skip(item), hidden: !item.occurrenceDate || item.done },
+            { label: 'Open project', icon: <FolderKanban className="h-4 w-4" />, onSelect: () => navigate(linkTo.project(proj!.id)), hidden: !proj },
+            { label: 'Open goal', icon: <Target className="h-4 w-4" />, onSelect: () => navigate(linkTo.goal(goal!.id)), hidden: !goal },
             { label: 'Duplicate', icon: <Copy className="h-4 w-4" />, onSelect: () => void actions.duplicate(t) },
             archived
               ? { label: 'Restore', icon: <ArchiveRestore className="h-4 w-4" />, onSelect: () => void actions.archive(t, false) }

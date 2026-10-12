@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,6 +12,7 @@ import { RecurrenceEditor } from '@/components/RecurrenceEditor'
 import { getStore } from '@/lib/db'
 import { useInvalidate } from '@/lib/db/hooks'
 import { useLookups } from '@/lib/lookups'
+import { linkTo } from '@/lib/links'
 import { toast } from '@/components/ui/toast'
 import { useSettings } from '@/settings/SettingsProvider'
 import { dateKey, timeOf, zonedToInstant } from '@/lib/dates'
@@ -121,6 +123,11 @@ export function BlockEditor({ target, onClose }: { target: BlockTarget | null; o
         <Field label="What" htmlFor="b-title" className="col-span-2" error={formState.errors.title?.message}>
           <Input id="b-title" data-autofocus placeholder="e.g. Deep work: DSA" {...register('title')} />
         </Field>
+        {b?.task_id && (
+          <Link to={linkTo.task(b.task_id)} className="col-span-2 -mt-2 text-xs text-accent hover:underline">
+            Open the task this block is for
+          </Link>
+        )}
         <Field label={b?.recurrence ? 'First day' : 'Day'} htmlFor="b-date" className="col-span-2" error={formState.errors.date?.message}>
           <Input id="b-date" type="date" {...register('date')} />
         </Field>

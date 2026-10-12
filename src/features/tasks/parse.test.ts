@@ -28,6 +28,11 @@ describe('parseQuickEntry', () => {
     expect(parseQuickEntry('Pay rent oct 5', TZ, NOW).due_date).toBe('2027-10-05')
     expect(parseQuickEntry('Call home in 3 days', TZ, NOW).due_date).toBe('2026-10-14')
   })
+  it('reads "day after tomorrow" as two days out', () => {
+    const r = parseQuickEntry('Submit lab record day after tomorrow', TZ, NOW)
+    expect(r.title).toBe('Submit lab record')
+    expect(r.due_date).toBe('2026-10-13')
+  })
   it('handles recurrence', () => {
     const r = parseQuickEntry('Leetcode every weekday at 7am', TZ, NOW)
     expect(r.title).toBe('Leetcode')

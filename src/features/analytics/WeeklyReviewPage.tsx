@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Trophy, AlertTriangle } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
@@ -12,7 +12,9 @@ import { Field, Textarea } from '@/components/ui/Field'
 import { PageHeader, Panel, ProgressBar, Stat } from '@/components/ui/misc'
 import { toast } from '@/components/ui/toast'
 import { useTaskData } from '@/features/tasks/useTaskData'
-import { expandTasks } from '@/features/tasks/logic'
+import { expandTasks, type TaskInstance } from '@/features/tasks/logic'
+import { TaskEditor } from '@/features/tasks/TaskEditor'
+import { linkTo } from '@/lib/links'
 import { habitRates, studyBySubject } from './logic'
 
 const PROMPTS = [
@@ -30,7 +32,14 @@ export function WeeklyReviewPage() {
   const thisWeek = startOfWeek(today, settings.week_start)
   // Default to last week until the weekend, then the current week.
   const defaultWeek = addDays(thisWeek, ['Sat', 'Sun'].includes(formatKey(today, 'EEE')) ? 0 : -7)
-  const [week, setWeek] = useState(defaultWeek)
+  // Deep link: /review?week=<week start> opens that week (used by saved reviews in Inbox & notes).
+  const [params] = useSearchParams()
+  const linkedWeek = params.get('week')
+  const [week, setWeek] = useState(() => (linkedWeek && /^\d{4}-\d{2}-\d{2}$/.test(linkedWeek) ? linkedWeek : defaultWeek))
+  useEffect(() => {
+    if (linkedWeek && /^\d{4}-\d{2}-\d{2}$/.test(linkedWeek)) setWeek(linkedWeek)
+  }, [linkedWeek])
+  const [openTask, setOpenTask] = useState<TaskInstance | null>(null)
   const end = addDays(week, 6)
   const since = zonedToInstant(week, '00:00', tz).toISOString()
 
@@ -116,8 +125,10 @@ export function WeeklyReviewPage() {
           ) : (
             <ul className="max-h-72 overflow-y-auto text-sm">
               {completed.map((i) => (
-                <li key={i.key} className="truncate border-b border-line py-1.5 last:border-0">
-                  {i.task.title}
+                <li key={i.key} className="border-b border-line py-1.5 last:border-0">
+                  <button type="button" onClick={() => setOpenTask(i)} className="block w-full truncate text-left hover:underline">
+                    {i.task.title}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -143,7 +154,9 @@ export function WeeklyReviewPage() {
             <ul className="max-h-72 overflow-y-auto text-sm">
               {missed.map((i) => (
                 <li key={i.key} className="flex justify-between gap-2 border-b border-line py-1.5 last:border-0">
-                  <span className="truncate">{i.task.title}</span>
+                  <button type="button" onClick={() => setOpenTask(i)} className="truncate text-left hover:underline">
+                    {i.task.title}
+                  </button>
                   <span className="shrink-0 text-xs text-muted">{formatKey(i.date!, 'EEE')}</span>
                 </li>
               ))}
@@ -156,11 +169,13 @@ export function WeeklyReviewPage() {
           ) : (
             <ul className="flex flex-col gap-3">
               {(subjects.data ?? []).map((s) => {
-                const mins = bySubject.find((b) => b.name === s.name)?.minutes ?? 0
+                const mins = bySubject.find((b) => b.id === s.id)?.minutes ?? 0
                 return (
                   <li key={s.id}>
                     <div className="mb-1 flex justify-between text-sm">
-                      <span className="truncate">{s.name}</span>
+                      <Link to={linkTo.subject(s.id)} className="truncate hover:underline">
+                        {s.name}
+                      </Link>
                       <span className="text-xs text-muted">
                         {formatMinutes(mins) || '0m'}
                         {s.weekly_target_minutes ? ` / ${formatMinutes(s.weekly_target_minutes)}` : ''}
@@ -179,9 +194,11 @@ export function WeeklyReviewPage() {
           ) : (
             <ul className="flex flex-col gap-3">
               {rates.map((r) => (
-                <li key={r.name}>
+                <li key={r.id}>
                   <div className="mb-1 flex justify-between text-sm">
-                    <span className="truncate">{r.name}</span>
+                    <Link to={linkTo.habit(r.id)} className="truncate hover:underline">
+                      {r.name}
+                    </Link>
                     <span className="text-xs text-muted">
                       {r.done} of {plural(r.due, 'time')}
                     </span>
@@ -214,6 +231,7 @@ export function WeeklyReviewPage() {
           </form>
         </Panel>
       </div>
+      <TaskEditor open={!!openTask} task={openTask?.task} onClose={() => setOpenTask(null)} />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Sparkles } from 'lucide-react'
 import { Dialog } from '@/components/ui/Dialog'
 import { Button } from '@/components/ui/Button'
@@ -13,6 +14,7 @@ import { useTaskActions } from './actions'
 import { getStore } from '@/lib/db'
 import { useInvalidate } from '@/lib/db/hooks'
 import { toast } from '@/components/ui/toast'
+import { linkTo } from '@/lib/links'
 import { TaskEditor } from './TaskEditor'
 import type { Task } from '@/lib/db/types'
 
@@ -30,6 +32,7 @@ export function QuickAddDialog({ open, onClose }: { open: boolean; onClose: () =
   const [details, setDetails] = useState<Partial<Task> | null>(null)
   const actions = useTaskActions()
   const invalidate = useInvalidate()
+  const navigate = useNavigate()
 
   // Reset after closing, so text typed right as the dialog opens is never wiped.
   useEffect(() => {
@@ -64,9 +67,9 @@ export function QuickAddDialog({ open, onClose }: { open: boolean; onClose: () =
         const v = values()
         if (v) await actions.create(v)
       } else {
-        await getStore().insert('notes', { kind, title: text.trim().slice(0, 300), content: text.trim().length > 300 ? text.trim() : '', status: 'inbox' })
+        const note = await getStore().insert('notes', { kind, title: text.trim().slice(0, 300), content: text.trim().length > 300 ? text.trim() : '', status: 'inbox' })
         invalidate('notes')
-        toast.success(kind === 'idea' ? 'Idea captured' : 'Note captured')
+        toast.success(kind === 'idea' ? 'Idea captured' : 'Note captured', { label: 'Open', onClick: () => navigate(linkTo.note(note.id)) })
       }
       onClose()
     } finally {
@@ -123,7 +126,7 @@ export function QuickAddDialog({ open, onClose }: { open: boolean; onClose: () =
               </p>
               <p className="font-medium">{parsed.title}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <Badge>{parsed.due_date ? relativeDay(parsed.due_date, today) : 'No date (Inbox)'}</Badge>
+                <Badge>{parsed.due_date ? relativeDay(parsed.due_date, today) : 'No date'}</Badge>
                 {parsed.time && <Badge>at {parsed.time}</Badge>}
                 {parsed.estimated_minutes && <Badge>{formatMinutes(parsed.estimated_minutes)}</Badge>}
                 {parsed.priority !== 'normal' && <Badge>{parsed.priority} priority</Badge>}
