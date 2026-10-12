@@ -102,8 +102,11 @@ Deno.serve(async (req) => {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: 'high' })
       return 'ok'
     } catch (e) {
-      const code = (e as { statusCode?: number }).statusCode
-      return code === 404 || code === 410 ? 'gone' : 'failed'
+      const err = e as { statusCode?: number; body?: string; message?: string }
+      if (err.statusCode === 404 || err.statusCode === 410) return 'gone'
+      // 401/403 almost always means the app's public key and the function's VAPID keys are not a pair.
+      const hint = err.statusCode === 401 || err.statusCode === 403 ? ' (VAPID keys do not match the app key)' : ''
+      return { failed: `Push service said ${err.statusCode ?? 'error'}${hint}: ${String(err.body || err.message || '').slice(0, 160)}` }
     }
   })
   return new Response(JSON.stringify(result), { headers: { 'content-type': 'application/json' } })

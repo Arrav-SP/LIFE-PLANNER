@@ -151,3 +151,15 @@ test('pages link to each other: habit, goal and note', async ({ page }) => {
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByLabel('Title')).toHaveValue('Ask about lab marks')
 })
+
+test('the reminders panel fits on screen', async ({ page }) => {
+  // Narrower than the Pixel 7 preset, like many Android phones.
+  if (isMobile(page)) await page.setViewportSize({ width: 360, height: 780 })
+  await page.getByRole('button', { name: /^(\d+ )?reminders$/i }).filter({ visible: true }).first().click()
+  const panel = page.getByText('Nothing needs your attention.').locator('..')
+  await expect(panel).toBeVisible()
+  const box = (await panel.boundingBox())!
+  const width = page.viewportSize()!.width
+  expect(box.x).toBeGreaterThanOrEqual(0)
+  expect(box.x + box.width).toBeLessThanOrEqual(width)
+})
