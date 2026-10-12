@@ -202,6 +202,26 @@ export function SettingsPage() {
   )
 }
 
+/** A one-off reminder a minute from now. The push server sends it to every device that has push on. */
+async function sendTestPush() {
+  try {
+    const at = new Date(Date.now() + 60_000)
+    await getStore().insert('reminders', {
+      source_type: 'custom',
+      source_id: null,
+      title: 'Test notification',
+      body: 'Push works on this device.',
+      url: '/settings#notifications',
+      remind_at: at.toISOString(),
+      dedupe_key: `custom:test:${at.getTime()}`,
+    })
+    window.dispatchEvent(new Event('lp:reminders-changed'))
+    toast.success('Sent. Close the app or lock your phone now; it should arrive within 2 minutes.')
+  } catch (e) {
+    toast.error(errorMessage(e))
+  }
+}
+
 function NotificationSettings({ notif }: { notif: (p: Partial<UserSettings['notifications']>) => void }) {
   const { settings } = useSettings()
   const [perm, setPerm] = useState(notificationPermission())
@@ -259,7 +279,8 @@ function NotificationSettings({ notif }: { notif: (p: Partial<UserSettings['noti
                   if (v) await subscribePush()
                   else await unsubscribePush()
                   setPushOn(v)
-                  notif({ push: v })
+                  // Push is per device: turning it off here must not stop it on your other devices.
+                  if (v && settings.notifications.push === false) notif({ push: true })
                   toast.success(v ? 'Push notifications on for this device' : 'Push turned off for this device')
                 } catch (e) {
                   toast.error(errorMessage(e))
@@ -270,6 +291,11 @@ function NotificationSettings({ notif }: { notif: (p: Partial<UserSettings['noti
               label={busy ? 'Working…' : 'Push notifications when the app is closed (this device)'}
             />
             {!avail.ok && <p className="mt-1 text-xs text-muted">{avail.reason}</p>}
+            {avail.ok && pushOn && (
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => void sendTestPush()}>
+                Send a test notification
+              </Button>
+            )}
           </div>
           <Switch checked={settings.notifications.habit_reminders !== false} onChange={(v) => notif({ habit_reminders: v })} label="Habit reminders" />
           <Field label="Default reminders for new timed tasks">{offsets('task_default_offsets')}</Field>
