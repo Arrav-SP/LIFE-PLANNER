@@ -9,6 +9,8 @@ function fail(error: PostgrestError | null, fallback: string): never {
   if (code === '23505') throw new StoreError('An entry with the same details already exists.', code)
   if (code === '23503') throw new StoreError('A linked record could not be found. It may have been deleted.', code)
   if (code === '23514') throw new StoreError('Some values are out of range. Check the form and try again.', code)
+  if (code === 'PGRST204' || code === 'PGRST205')
+    throw new StoreError('This needs a database update first. Run the newest file in supabase/migrations in the Supabase SQL Editor.', code)
   if (code === '42501') throw new StoreError('Your session has expired. Sign in again to continue.', code)
   if (code === 'PGRST301' || code === 'PGRST303') throw new StoreError('Your session has expired. Sign in again to continue.', code)
   if (error.message?.toLowerCase().includes('fetch')) throw new StoreError('You appear to be offline. Changes were not saved.', 'offline')
