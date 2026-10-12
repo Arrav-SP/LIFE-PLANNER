@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/Button'
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field'
 import { RecurrenceEditor } from '@/components/RecurrenceEditor'
 import { useSettings } from '@/settings/SettingsProvider'
+import { Link } from 'react-router-dom'
 import { useLookups } from '@/lib/lookups'
+import { linkTo } from '@/lib/links'
 import { useList } from '@/lib/db/hooks'
 import { eq } from '@/lib/db/store'
 import { dateKey, formatInstant, timeOf, zonedToInstant } from '@/lib/dates'
@@ -211,7 +213,7 @@ export function TaskEditor({
         <Field label="Actual (minutes)" htmlFor="t-act">
           <Input id="t-act" type="number" min={0} inputMode="numeric" value={d.actual_minutes} onChange={(e) => set('actual_minutes', e.target.value)} />
         </Field>
-        <Field label="Project" htmlFor="t-proj">
+        <Field label="Project" htmlFor="t-proj" hint={task?.project_id && task?.project_id === d.project_id ? <Link to={linkTo.project(task?.project_id)} className="text-accent hover:underline">Open project</Link> : undefined}>
           <Select id="t-proj" value={d.project_id} onChange={(e) => set('project_id', e.target.value)}>
             <option value="">None</option>
             {milestoneProjects.map((p) => (
@@ -221,7 +223,7 @@ export function TaskEditor({
             ))}
           </Select>
         </Field>
-        <Field label="Goal" htmlFor="t-goal">
+        <Field label="Goal" htmlFor="t-goal" hint={task?.goal_id && task?.goal_id === d.goal_id ? <Link to={linkTo.goal(task?.goal_id)} className="text-accent hover:underline">Open goal</Link> : undefined}>
           <Select id="t-goal" value={d.goal_id} onChange={(e) => set('goal_id', e.target.value)}>
             <option value="">None</option>
             {lookups.goals.map((g) => (

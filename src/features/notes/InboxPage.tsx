@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Archive, Bell, CalendarPlus, CheckSquare, Inbox, Lightbulb, Link2, Pin, PinOff, StickyNote, Trash2 } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
 import { getStore } from '@/lib/db'
 import { formatInstant, zonedToInstant, addDays } from '@/lib/dates'
 import { cn, errorMessage } from '@/lib/utils'
+import { convertedLink, linkTo } from '@/lib/links'
+import { useLookups } from '@/lib/lookups'
 import { Button } from '@/components/ui/Button'
 import { Dialog, confirm } from '@/components/ui/Dialog'
 import { Field, Input, Select, Textarea } from '@/components/ui/Field'
@@ -31,6 +34,18 @@ export function InboxPage() {
   const notes = useList('notes', { order: [{ field: 'created_at', ascending: false }] })
   const invalidate = useInvalidate()
   const taskActions = useTaskActions()
+  const lookups = useLookups()
+  const [params, setParams] = useSearchParams()
+
+  // Deep link: /inbox?note=<id> opens that note.
+  const linked = (notes.data ?? []).find((n) => n.id === params.get('note'))
+  useEffect(() => {
+    if (!linked) return
+    setTab(linked.status)
+    setEditing(linked)
+    params.delete('note')
+    setParams(params, { replace: true })
+  }, [linked, params, setParams])
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -170,7 +185,22 @@ export function InboxPage() {
                   )}
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                     {formatInstant(n.created_at, tz, 'd MMM, HH:mm')}
-                    {n.converted_type && <Badge>Became a {n.converted_type}</Badge>}
+                    {n.converted_type && <ConvertedBadge kind={n.converted_type} id={n.converted_id} />}
+                    {reviewWeek(n) && (
+                      <Link to={linkTo.week(reviewWeek(n)!)} className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                        Open weekly review
+                      </Link>
+                    )}
+                    {lookups.goal(n.goal_id) && (
+                      <Link to={linkTo.goal(n.goal_id!)} className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {lookups.goal(n.goal_id)!.title}
+                      </Link>
+                    )}
+                    {lookups.project(n.project_id) && (
+                      <Link to={linkTo.project(n.project_id!)} className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {lookups.project(n.project_id)!.name}
+                      </Link>
+                    )}
                     {n.tags.map((t) => (
                       <span key={t} className="text-accent">
                         #{t}
@@ -237,6 +267,23 @@ export function InboxPage() {
         }}
       />
     </div>
+  )
+}
+
+/** Weekly reviews are saved as notes titled "… week of <date>"; returns that week, if this is one. */
+function reviewWeek(n: Note): string | null {
+  if (!n.tags.includes('weekly-review')) return null
+  return /(\d{4}-\d{2}-\d{2})$/.exec(n.title)?.[1] ?? null
+}
+
+function ConvertedBadge({ kind, id }: { kind: string; id: string | null }) {
+  const to = convertedLink(kind, id)
+  const badge = <Badge>Became a {kind}</Badge>
+  if (!to) return badge
+  return (
+    <Link to={to} className="hover:underline" title={`Open the ${kind}`} onClick={(e) => e.stopPropagation()}>
+      {badge}
+    </Link>
   )
 }
 

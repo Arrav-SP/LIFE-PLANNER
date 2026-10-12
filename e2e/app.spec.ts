@@ -123,3 +123,31 @@ test('pages fit the screen without sideways scrolling', async ({ page }) => {
     expect(overflow, `${path} overflows by ${overflow}px`).toBeLessThanOrEqual(1)
   }
 })
+
+test('pages link to each other: habit, goal and note', async ({ page }) => {
+  await page.goto('/goals?new=1')
+  await page.getByLabel('Title').fill('Clear FAT')
+  await page.getByRole('button', { name: 'Create goal' }).click()
+  await page.goto('/habits?new=1')
+  await page.getByLabel('Name').fill('DSA problems')
+  await page.getByLabel('Linked goal').selectOption({ label: 'Clear FAT' })
+  await page.getByRole('button', { name: 'Add habit' }).click()
+
+  // Habit card links to its goal, and the goal links back to the habit.
+  await page.getByRole('link', { name: 'Clear FAT' }).click()
+  await expect(page).toHaveURL(/\/goals\?goal=/)
+  await page.getByRole('link', { name: 'DSA problems' }).click()
+  await expect(page).toHaveURL(/\/habits\?habit=/)
+  await expect(page.locator('li.ring-2')).toContainText('DSA problems')
+
+  // A captured note's toast opens the note itself.
+  if (isMobile(page)) await page.getByRole('button', { name: 'Quick add' }).last().click()
+  else await page.keyboard.press('q')
+  await page.getByLabel('Type').selectOption('note')
+  await page.getByLabel('What do you want to add?').fill('Ask about lab marks')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.getByRole('button', { name: 'Open' }).click()
+  await expect(page).toHaveURL(/\/inbox/)
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Title')).toHaveValue('Ask about lab marks')
+})

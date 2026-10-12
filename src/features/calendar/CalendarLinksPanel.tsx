@@ -58,7 +58,7 @@ export function CalendarLinksPanel() {
 
   if (mode !== 'supabase') {
     return (
-      <Panel title="Google Calendar">
+      <Panel id="google-calendar" title="Google Calendar">
         <p className="text-sm text-muted">Calendar links need sync (Supabase). Local mode keeps everything in this browser.</p>
       </Panel>
     )
@@ -86,7 +86,7 @@ export function CalendarLinksPanel() {
 
   return (
     <section id="calendar-links">
-      <Panel title="Google Calendar">
+      <Panel id="google-calendar" title="Google Calendar">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Show your plans in Google Calendar</h3>

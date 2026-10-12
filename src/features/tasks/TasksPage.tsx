@@ -17,7 +17,7 @@ import { parseQuickEntry } from './parse'
 
 type ViewKey = TaskView | 'archived'
 const VIEWS: { value: ViewKey; label: string }[] = [
-  { value: 'inbox', label: 'Inbox' },
+  { value: 'inbox', label: 'No date' },
   { value: 'today', label: 'Today' },
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'overdue', label: 'Overdue' },

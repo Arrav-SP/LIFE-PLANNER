@@ -151,7 +151,13 @@ export function RemindersPage() {
         <ul className="flex flex-col">
           {(history.data ?? []).map((h) => (
             <li key={h.id} className="flex items-center gap-3 border-b border-line px-1 py-2 text-sm last:border-0">
-              <span className="min-w-0 flex-1 truncate">{h.title}</span>
+              {h.url ? (
+                <Link to={h.url} className="min-w-0 flex-1 truncate hover:underline">
+                  {h.title}
+                </Link>
+              ) : (
+                <span className="min-w-0 flex-1 truncate">{h.title}</span>
+              )}
               <Badge>{h.channel === 'in_app' ? 'In app' : h.channel === 'browser' ? 'Browser' : 'Push'}</Badge>
               {h.status !== 'delivered' && <Badge color="rgb(var(--warning))">{h.status}</Badge>}
               <span className="w-32 text-right text-xs text-muted">{formatInstant(h.created_at, tz, 'd MMM, HH:mm')}</span>
