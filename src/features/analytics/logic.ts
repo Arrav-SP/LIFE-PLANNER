@@ -33,7 +33,7 @@ export function studyByDay(sessions: StudySession[], from: DateKey, to: DateKey,
   return [...m].map(([date, value]) => ({ date, value }))
 }
 
-export function studyBySubject(sessions: StudySession[], subjects: Subject[], from: DateKey, to: DateKey, tz: string): { name: string; color: string; minutes: number }[] {
+export function studyBySubject(sessions: StudySession[], subjects: Subject[], from: DateKey, to: DateKey, tz: string): { id: string | null; name: string; color: string; minutes: number }[] {
   const m = new Map<string, number>()
   for (const s of sessions) {
     if (!s.ended_at) continue
@@ -45,14 +45,14 @@ export function studyBySubject(sessions: StudySession[], subjects: Subject[], fr
   return [...m]
     .map(([id, minutes]) => {
       const sub = subjects.find((x) => x.id === id)
-      return { name: sub?.name ?? 'General', color: sub?.color ?? '#64748b', minutes }
+      return { id: sub?.id ?? null, name: sub?.name ?? 'General', color: sub?.color ?? '#64748b', minutes }
     })
     .filter((x) => x.minutes > 0)
     .sort((a, b) => b.minutes - a.minutes)
 }
 
 /** Share of scheduled days each habit was completed in the range (weekly habits: completions / expected). */
-export function habitRates(habits: Habit[], checkins: HabitCheckin[], from: DateKey, to: DateKey): { name: string; color: string; rate: number; done: number; due: number }[] {
+export function habitRates(habits: Habit[], checkins: HabitCheckin[], from: DateKey, to: DateKey): { id: string; name: string; color: string; rate: number; done: number; due: number }[] {
   const days = daysInRange(from, to)
   return habits.map((h) => {
     const map = checkinMap(checkins, h.id)
@@ -69,6 +69,6 @@ export function habitRates(habits: Habit[], checkins: HabitCheckin[], from: Date
         if (isComplete(h, map.get(d))) done++
       }
     }
-    return { name: h.name, color: h.color, rate: due ? Math.min(1, done / due) : 0, done, due }
+    return { id: h.id, name: h.name, color: h.color, rate: due ? Math.min(1, done / due) : 0, done, due }
   })
 }

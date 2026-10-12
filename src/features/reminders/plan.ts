@@ -5,6 +5,7 @@ import type { CalendarEvent, DateKey, EventException, Habit, Reminder, Task } fr
 import type { Insert } from '@/lib/db/store'
 import { addDays, dateKey, timeOf, todayKey, weekdayOf, zonedToInstant } from '@/lib/dates'
 import { nextOccurrence, timedOccurrences } from '@/lib/recurrence'
+import { linkTo } from '@/lib/links'
 import { seriesStart } from '@/features/tasks/logic'
 
 export type PlannedReminder = Insert<'reminders'> & { dedupe_key: string; remind_at: string }
@@ -124,7 +125,7 @@ export function planHabitReminders(h: Habit, tz: string, now: number = Date.now(
         occurrence_key: d,
         title: h.name,
         body: 'Time for your habit',
-        url: '/habits',
+        url: linkTo.habit(h.id),
         remind_at: at.toISOString(),
         offset_minutes: 0,
         dedupe_key: `habit:${h.id}:${d}`,

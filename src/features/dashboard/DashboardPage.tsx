@@ -6,6 +6,7 @@ import { useList } from '@/lib/db/hooks'
 import { gte, isNull, lte } from '@/lib/db/store'
 import { addDays, formatKey, formatTime, greeting, relativeDay, zonedToInstant } from '@/lib/dates'
 import { cn, formatMinutes, plural } from '@/lib/utils'
+import { linkTo } from '@/lib/links'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Field'
 import { Badge, ColorDot, EmptyState, ListSkeleton, Panel, ProgressBar } from '@/components/ui/misc'
@@ -61,13 +62,13 @@ export function DashboardPage() {
   const unscheduled = useMemo(() => viewInstances('inbox', tasks, occurrences, today, tz).slice(0, 6), [tasks, occurrences, today, tz])
 
   const schedule = useMemo(() => {
-    const ev = expandEvents(events.data ?? [], exceptions.data ?? [], dayStart, dayEnd, tz).map((e) => ({ key: e.key, title: e.title, start: e.start, end: e.end, allDay: e.allDay, color: e.color, kind: 'event' as const, done: false }))
-    const bl = expandBlocks(blocks.data ?? [], dayStart, dayEnd, tz).map((b) => ({ key: b.instanceKey, title: b.title, start: b.start, end: b.end, allDay: false, color: b.color, kind: 'block' as const, done: b.status === 'done' }))
+    const ev = expandEvents(events.data ?? [], exceptions.data ?? [], dayStart, dayEnd, tz).map((e) => ({ key: e.key, title: e.title, start: e.start, end: e.end, allDay: e.allDay, color: e.color, kind: 'event' as const, done: false, to: linkTo.event(e.event.id) as string | null, item: null as TaskInstance | null }))
+    const bl = expandBlocks(blocks.data ?? [], dayStart, dayEnd, tz).map((b) => ({ key: b.instanceKey, title: b.title, start: b.start, end: b.end, allDay: false, color: b.color, kind: 'block' as const, done: b.status === 'done', to: linkTo.planner(today) as string | null, item: null as TaskInstance | null }))
     const timedTasks = todayTasks
       .filter((i) => i.scheduledAt && i.date === today)
       .map((i) => {
         const start = new Date(i.scheduledAt!)
-        return { key: i.key, title: i.task.title, start, end: new Date(start.getTime() + (i.task.estimated_minutes || settings.default_task_minutes) * 60000), allDay: false, color: null, kind: 'task' as const, done: i.done }
+        return { key: i.key, title: i.task.title, start, end: new Date(start.getTime() + (i.task.estimated_minutes || settings.default_task_minutes) * 60000), allDay: false, color: null, kind: 'task' as const, done: i.done, to: null as string | null, item: i as TaskInstance | null }
       })
     return [...ev, ...bl, ...timedTasks].sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.getTime() - b.start.getTime())
   }, [events.data, exceptions.data, blocks.data, todayTasks, dayStart, dayEnd, tz, today, settings.default_task_minutes])
@@ -153,18 +154,20 @@ export function DashboardPage() {
             {schedule.map((s) => {
               const current = !s.allDay && s.start <= now && s.end > now
               return (
-                <li key={s.key} className={cn('flex items-start gap-3 rounded-lg px-2 py-1.5', current && 'bg-accent-soft/60')}>
-                  <span className="w-[4.5rem] shrink-0 pt-0.5 text-xs tabular text-muted">{s.allDay ? 'All day' : formatTime(s.start, tz, settings.time_format)}</span>
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: s.color ?? (s.kind === 'task' ? 'rgb(var(--accent))' : s.kind === 'block' ? 'rgb(var(--warning))' : 'rgb(var(--accent))') }} aria-hidden />
-                  <span className="min-w-0 flex-1">
-                    <span className={cn('block truncate text-sm', s.done && 'text-muted line-through')}>{s.title}</span>
-                    {!s.allDay && (
-                      <span className="text-xs text-muted">
-                        {s.kind === 'event' ? 'Event' : s.kind === 'block' ? 'Time block' : 'Task'} · until {formatTime(s.end, tz, settings.time_format)}
-                      </span>
-                    )}
-                  </span>
-                  {current && <Badge color="rgb(var(--accent))">Now</Badge>}
+                <li key={s.key}>
+                  <ScheduleRow to={s.to} onOpen={s.item ? () => setOpenTask(s.item) : undefined} className={cn('flex w-full items-start gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-surface-2', current && 'bg-accent-soft/60')}>
+                    <span className="w-[4.5rem] shrink-0 pt-0.5 text-xs tabular text-muted">{s.allDay ? 'All day' : formatTime(s.start, tz, settings.time_format)}</span>
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: s.color ?? (s.kind === 'task' ? 'rgb(var(--accent))' : s.kind === 'block' ? 'rgb(var(--warning))' : 'rgb(var(--accent))') }} aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className={cn('block truncate text-sm', s.done && 'text-muted line-through')}>{s.title}</span>
+                      {!s.allDay && (
+                        <span className="text-xs text-muted">
+                          {s.kind === 'event' ? 'Event' : s.kind === 'block' ? 'Time block' : 'Task'} · until {formatTime(s.end, tz, settings.time_format)}
+                        </span>
+                      )}
+                    </span>
+                    {current && <Badge color="rgb(var(--accent))">Now</Badge>}
+                  </ScheduleRow>
                 </li>
               )
             })}
@@ -256,7 +259,7 @@ export function DashboardPage() {
         }
         action={
           <Link to="/tasks?view=inbox" className="text-xs font-medium text-accent hover:underline">
-            Inbox
+            All undated
           </Link>
         }
         bodyClassName="p-2"
@@ -362,6 +365,23 @@ export function DashboardPage() {
   )
 }
 
+/** A schedule row that opens its item: a link for events and blocks, a button for tasks. */
+function ScheduleRow({ to, onOpen, className, children }: { to: string | null; onOpen?: () => void; className: string; children: React.ReactNode }) {
+  if (onOpen)
+    return (
+      <button type="button" onClick={onOpen} className={className}>
+        {children}
+      </button>
+    )
+  if (to)
+    return (
+      <Link to={to} className={className}>
+        {children}
+      </Link>
+    )
+  return <div className={className}>{children}</div>
+}
+
 function HabitsToday({ habits, checkins, loading }: { habits: import('@/lib/db/types').Habit[]; checkins: import('@/lib/db/types').HabitCheckin[]; loading: boolean }) {
   const { today, settings } = useSettings()
   const actions = useHabitActions()
@@ -389,7 +409,9 @@ function HabitsToday({ habits, checkins, loading }: { habits: import('@/lib/db/t
             <li key={h.id} className="flex items-center gap-3 rounded-lg px-1 py-1.5">
               <Checkbox round checked={s.doneToday} label={`${s.doneToday ? 'Undo' : 'Check in'} ${h.name}`} onChange={() => void actions.toggle(h, today, c)} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm">{h.name}</span>
+                <Link to={linkTo.habit(h.id)} className="block truncate text-sm hover:underline">
+                  {h.name}
+                </Link>
                 {h.kind === 'numeric' && (
                   <span className="text-xs text-muted">
                     {c?.value ?? 0} / {h.target_value ?? 1} {h.unit}

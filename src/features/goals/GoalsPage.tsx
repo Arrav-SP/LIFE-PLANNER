@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Archive, Flag, Pencil, Plus, Target, Trash2 } from 'lucide-react'
+import { ArrowLeft, Archive, BookOpen, CalendarDays, Flag, Pencil, Plus, StickyNote, Target, Trash2 } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
 import { eq, isNull } from '@/lib/db/store'
 import { getStore } from '@/lib/db'
-import { formatInstant, relativeDay } from '@/lib/dates'
+import { dateKey, formatInstant, relativeDay } from '@/lib/dates'
 import { cn, errorMessage } from '@/lib/utils'
+import { linkTo } from '@/lib/links'
 import { Button } from '@/components/ui/Button'
 import { confirm } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Field'
@@ -141,6 +142,12 @@ function GoalDetail({ goal, data, tasks, onBack }: { goal: Goal; data: Parameter
   const [addingTask, setAddingTask] = useState(false)
   const [metricValue, setMetricValue] = useState('')
   const habits = useList('habits', { filters: [eq('goal_id', goal.id), isNull('archived_at')] })
+  const subjects = useList('subjects', { filters: [eq('goal_id', goal.id), isNull('archived_at')] })
+  const events = useList('events', { filters: [eq('goal_id', goal.id), isNull('archived_at')], order: [{ field: 'start_at' }] })
+  const notes = useList('notes', { filters: [eq('goal_id', goal.id)], order: [{ field: 'created_at', ascending: false }] })
+  const nowIso = new Date().toISOString()
+  const linkedEvents = (events.data ?? []).filter((e) => e.recurrence || e.end_at >= nowIso).slice(0, 8)
+  const linkedNotes = (notes.data ?? []).filter((n) => n.status !== 'archived').slice(0, 8)
   const p = goalProgress(goal, data)
   const track = goal.status === 'active' ? onTrack(goal.created_at, goal.target_date, p.ratio, today) : null
   const projects = data.projects.filter((x) => x.goal_id === goal.id)
@@ -297,8 +304,53 @@ function GoalDetail({ goal, data, tasks, onBack }: { goal: Goal; data: Parameter
           <ul className="flex flex-wrap gap-2">
             {(habits.data ?? []).map((h) => (
               <li key={h.id}>
-                <Link to="/habits" className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-sm hover:bg-surface-2">
+                <Link to={linkTo.habit(h.id)} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-sm hover:bg-surface-2">
                   <ColorDot color={h.color} /> {h.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
+      {(subjects.data ?? []).length > 0 && (
+        <Panel title="Study subjects">
+          <ul className="flex flex-wrap gap-2">
+            {(subjects.data ?? []).map((s) => (
+              <li key={s.id}>
+                <Link to={linkTo.subject(s.id)} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-sm hover:bg-surface-2">
+                  <BookOpen className="h-3.5 w-3.5" style={{ color: s.color }} aria-hidden /> {s.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
+      {linkedEvents.length > 0 && (
+        <Panel title="Events">
+          <ul className="flex flex-col gap-1 text-sm">
+            {linkedEvents.map((e) => (
+              <li key={e.id}>
+                <Link to={linkTo.event(e.id)} className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-surface-2">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{e.title}</span>
+                  <span className="shrink-0 text-xs text-muted">{e.recurrence ? 'Repeats' : relativeDay(dateKey(e.start_at, tz), today)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
+      {linkedNotes.length > 0 && (
+        <Panel title="Linked notes">
+          <ul className="flex flex-col gap-1 text-sm">
+            {linkedNotes.map((n) => (
+              <li key={n.id}>
+                <Link to={linkTo.note(n.id)} className="flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-surface-2">
+                  <StickyNote className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{n.title || 'Untitled'}</span>
                 </Link>
               </li>
             ))}

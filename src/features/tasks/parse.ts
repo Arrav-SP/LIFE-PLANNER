@@ -135,11 +135,12 @@ export function parseQuickEntry(input: string, tz: string, now: Date = new Date(
   take(/\s(today)\b/i, () => {
     due = today
   })
-  take(/\s(tomorrow|tmrw|tmr)\b/i, () => {
-    due = addDays(today, 1)
-  })
+  // Before "tomorrow", which would otherwise eat the end of it.
   take(/\s(day after tomorrow)\b/i, () => {
     due = addDays(today, 2)
+  })
+  take(/\s(tomorrow|tmrw|tmr)\b/i, () => {
+    due = addDays(today, 1)
   })
   take(/\sin\s+(\d+)\s+(day|days|week|weeks)\b/i, (m) => {
     const n = parseInt(m[1], 10)
