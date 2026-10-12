@@ -11,7 +11,9 @@ import { Badge, EmptyState, PageHeader, Panel, ProgressBar } from '@/components/
 import { toast } from '@/components/ui/toast'
 import { useTaskData } from '@/features/tasks/useTaskData'
 import { useTaskActions } from '@/features/tasks/actions'
-import { expandTasks } from '@/features/tasks/logic'
+import { expandTasks, type TaskInstance } from '@/features/tasks/logic'
+import { TaskEditor } from '@/features/tasks/TaskEditor'
+import { linkTo } from '@/lib/links'
 import { goalProgress, onTrack } from '@/features/goals/logic'
 import { habitRates } from '@/features/analytics/logic'
 import { buildInsights, coachSummary, roundTo5, studyPlan, suggestToday, type Insight, type PlanStatus } from './logic'
@@ -43,6 +45,7 @@ const TONE_CLASS = { warn: 'text-danger', info: 'text-accent', good: 'text-succe
 export function CoachPage() {
   const { today, tz, settings } = useSettings()
   const [hours, setHours] = useState(loadHours)
+  const [openTask, setOpenTask] = useState<TaskInstance | null>(null)
   const budget = Math.round(hours * 60)
   const weekStart = startOfWeek(today, settings.week_start)
 
@@ -187,7 +190,9 @@ export function CoachPage() {
                     <span className="mt-0.5 w-4 shrink-0 text-xs font-semibold text-subtle tabular">{n + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="truncate text-sm font-medium">{s.instance.task.title}</span>
+                        <button type="button" onClick={() => setOpenTask(s.instance)} className="truncate text-left text-sm font-medium hover:underline">
+                          {s.instance.task.title}
+                        </button>
                         <span className="shrink-0 text-xs text-muted tabular">{formatMinutes(s.minutes)}</span>
                       </div>
                       {s.reasons.length > 0 && <p className="text-xs text-muted">{s.reasons.join(' · ')}</p>}
@@ -211,7 +216,9 @@ export function CoachPage() {
                   <ul className="mt-1">
                     {suggestions.extra.map((s) => (
                       <li key={s.instance.key} className="flex justify-between gap-2 py-1">
-                        <span className="truncate">{s.instance.task.title}</span>
+                        <button type="button" onClick={() => setOpenTask(s.instance)} className="truncate text-left hover:underline">
+                          {s.instance.task.title}
+                        </button>
                         <span className="shrink-0 text-xs text-muted">{s.reasons[0] ?? formatMinutes(s.minutes)}</span>
                       </li>
                     ))}
@@ -246,7 +253,9 @@ export function CoachPage() {
                 return (
                   <li key={p.subject.id} className="rounded-xl border border-line p-3">
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className="truncate font-medium">{p.subject.name}</span>
+                      <Link to={linkTo.subject(p.subject.id)} className="truncate font-medium hover:underline">
+                        {p.subject.name}
+                      </Link>
                       <Badge color={st.color}>{st.label}</Badge>
                     </div>
                     <p className="mb-2 text-xs text-muted">
@@ -274,6 +283,7 @@ export function CoachPage() {
           )}
         </Panel>
       </div>
+      <TaskEditor open={!!openTask} task={openTask?.task} onClose={() => setOpenTask(null)} />
       <p className="mt-4 text-xs text-subtle">
         The coach runs entirely in the app, with no AI service. For a deeper plan, use Copy for Claude and paste the result into a chat.
       </p>

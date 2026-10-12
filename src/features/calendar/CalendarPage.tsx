@@ -74,16 +74,25 @@ export function CalendarPage() {
     }
   }, [view, show])
 
-  // Deep link: /calendar?event=<id> opens the event.
+  // Deep links: /calendar?event=<id> opens the event on its day; /calendar?date=<yyyy-mm-dd> jumps to a day.
   useEffect(() => {
     const id = params.get('event')
     const ev = id && (events.data ?? []).find((e) => e.id === id)
     if (ev) {
+      cal.current?.getApi().gotoDate(dateKey(ev.start_at, tz))
       setEditor({ event: ev, scope: 'all' })
       params.delete('event')
       setParams(params, { replace: true })
     }
-  }, [params, events.data, setParams])
+  }, [params, events.data, setParams, tz])
+  useEffect(() => {
+    const date = params.get('date')
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      cal.current?.getApi().gotoDate(date)
+      params.delete('date')
+      setParams(params, { replace: true })
+    }
+  }, [params, setParams])
 
   const instances = useMemo(() => (range ? expandEvents(events.data ?? [], exceptions.data ?? [], range.start, range.end, tz) : []), [events.data, exceptions.data, range, tz])
   const blockInstances = useMemo(() => (range && show.blocks ? expandBlocks(blocks.data ?? [], range.start, range.end, tz) : []), [blocks.data, range, tz, show.blocks])

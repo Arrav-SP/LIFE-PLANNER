@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Download, LogOut, Moon, Monitor, Sun, Trash2, Upload } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useAuth } from '@/auth/AuthProvider'
@@ -8,6 +9,7 @@ import { TABLES, type TableName, type UserSettings } from '@/lib/db/types'
 import { browserTimeZone, formatInstant, isValidTimeZone, WEEKDAY_LONG } from '@/lib/dates'
 import { cn, COLOR_SWATCHES, errorMessage } from '@/lib/utils'
 import { env } from '@/lib/env'
+import { useScrollIntoView } from '@/lib/useScrollIntoView'
 import { Button } from '@/components/ui/Button'
 import { confirm } from '@/components/ui/Dialog'
 import { Field, Input, Select, Switch } from '@/components/ui/Field'
@@ -30,6 +32,9 @@ const ZONES: string[] = (() => {
 export function SettingsPage() {
   const { settings, update } = useSettings()
   const { user, signOut, mode } = useAuth()
+  // /settings#notifications (and other section ids) scrolls to that section.
+  const { hash } = useLocation()
+  useScrollIntoView(hash.slice(1) || null, true)
   const [name, setName] = useState(settings.display_name)
   useEffect(() => setName(settings.display_name), [settings.display_name])
 
@@ -254,7 +259,7 @@ function NotificationSettings({ notif }: { notif: (p: Partial<UserSettings['noti
   )
   return (
     <section id="notifications">
-      <Panel title="Notifications">
+      <Panel id="notifications" title="Notifications">
         <div className="flex flex-col gap-4">
           <Switch checked={settings.notifications.in_app !== false} onChange={(v) => notif({ in_app: v })} label="Show reminders inside the app" />
           <div className="flex flex-wrap items-center gap-3">
@@ -372,7 +377,7 @@ function DataPanel() {
   const invalidate = useInvalidate()
   const stamp = new Date().toISOString().slice(0, 10)
   return (
-    <Panel title="Your data">
+    <Panel id="data" title="Your data">
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button

@@ -9,7 +9,7 @@ It costs nothing to run. Every service below is used on its free tier, and none 
 | Area | What you can do |
 | --- | --- |
 | **Today** | A dashboard of today's tasks, schedule, habits, upcoming deadlines, goal progress and inbox. Pick and reorder the sections in Settings. |
-| **Tasks** | Inbox, Today, Upcoming, Overdue, All, Completed and Archived views, with grouping and sorting. Subtasks, priorities, tags, categories, estimates and recurring tasks (daily, weekdays, weekly on chosen days, monthly, yearly, "every N"). Each repeat can be completed or skipped on its own. |
+| **Tasks** | No date, Today, Upcoming, Overdue, All, Completed and Archived views, with grouping and sorting. Subtasks, priorities, tags, categories, estimates and recurring tasks (daily, weekdays, weekly on chosen days, monthly, yearly, "every N"). Each repeat can be completed or skipped on its own. |
 | **Quick add** | Type a sentence such as `Study OS for 90 minutes tomorrow at 6 PM` or `Leetcode every weekday at 7am #dsa !high`. You see what was understood before anything is saved. |
 | **Calendar** | Month, week, day and agenda views. Drag to create or move events. Repeating events can be edited or deleted for one occurrence or the whole series. Overlapping events are flagged. Times follow your time zone, including DST changes. |
 | **Planner** | A day timeline with time blocks, auto-placement of unscheduled tasks into free gaps, replanning for missed blocks, and a week view. |

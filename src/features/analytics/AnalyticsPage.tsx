@@ -5,6 +5,8 @@ import { useList } from '@/lib/db/hooks'
 import { gte, isNull } from '@/lib/db/store'
 import { addDays, dateKey, formatKey, zonedToInstant } from '@/lib/dates'
 import { formatMinutes } from '@/lib/utils'
+import { linkTo } from '@/lib/links'
+import { Link } from 'react-router-dom'
 import { EmptyState, PageHeader, Panel, ProgressBar, Segmented, Stat } from '@/components/ui/misc'
 import { useTaskData } from '@/features/tasks/useTaskData'
 import { goalProgress } from '@/features/goals/logic'
@@ -122,7 +124,9 @@ export function AnalyticsPage() {
                 {bySubject.map((s) => (
                   <li key={s.name} className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden />
-                    <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                    <MaybeLink to={s.id ? linkTo.subject(s.id) : null} className="min-w-0 flex-1 truncate">
+                      {s.name}
+                    </MaybeLink>
                     <span className="tabular text-muted">{formatMinutes(s.minutes)}</span>
                   </li>
                 ))}
@@ -137,9 +141,11 @@ export function AnalyticsPage() {
           ) : (
             <ul className="flex flex-col gap-3">
               {rates.map((r) => (
-                <li key={r.name}>
+                <li key={r.id}>
                   <div className="mb-1 flex justify-between text-sm">
-                    <span className="truncate">{r.name}</span>
+                    <Link to={linkTo.habit(r.id)} className="truncate hover:underline">
+                      {r.name}
+                    </Link>
                     <span className="text-xs text-muted">
                       {r.done}/{r.due} · {Math.round(r.rate * 100)}%
                     </span>
@@ -163,7 +169,9 @@ export function AnalyticsPage() {
                   return (
                     <li key={g.id}>
                       <div className="mb-1 flex justify-between text-sm">
-                        <span className="truncate font-medium">{g.title}</span>
+                        <Link to={linkTo.goal(g.id)} className="truncate font-medium hover:underline">
+                          {g.title}
+                        </Link>
                         <span className="text-xs text-muted">{p.label}</span>
                       </div>
                       <ProgressBar value={p.ratio} color={g.color} label={`${g.title} progress`} />
@@ -175,5 +183,15 @@ export function AnalyticsPage() {
         </Panel>
       </div>
     </div>
+  )
+}
+
+function MaybeLink({ to, className, children }: { to: string | null; className?: string; children: React.ReactNode }) {
+  return to ? (
+    <Link to={to} className={`${className ?? ''} hover:underline`}>
+      {children}
+    </Link>
+  ) : (
+    <span className={className}>{children}</span>
   )
 }

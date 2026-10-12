@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Archive, ArchiveRestore, Flame, Pencil, Plus, Repeat, Trash2, Trophy } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Archive, ArchiveRestore, Flame, Pencil, Plus, Repeat, Target, Trash2, Trophy } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useList, useInvalidate } from '@/lib/db/hooks'
 import { gte } from '@/lib/db/store'
 import { getStore } from '@/lib/db'
 import { addDays, formatKey, startOfWeek, WEEKDAY_SHORT, weekdayOf } from '@/lib/dates'
 import { cn, errorMessage } from '@/lib/utils'
+import { linkTo } from '@/lib/links'
+import { useScrollIntoView } from '@/lib/useScrollIntoView'
 import { Button } from '@/components/ui/Button'
 import { Dialog, confirm } from '@/components/ui/Dialog'
 import { Field, Input, Textarea } from '@/components/ui/Field'
@@ -14,7 +16,7 @@ import { Menu } from '@/components/ui/Menu'
 import { EmptyState, ListSkeleton, PageHeader, Segmented } from '@/components/ui/misc'
 import { toast } from '@/components/ui/toast'
 import { syncHabitReminders } from '@/features/reminders/sync'
-import type { DateKey, Habit, HabitCheckin } from '@/lib/db/types'
+import type { DateKey, Goal, Habit, HabitCheckin } from '@/lib/db/types'
 import { checkinMap, describeSchedule, habitScheduledOn, habitStats, isComplete } from './logic'
 import { useHabitActions } from './actions'
 import { HabitEditor } from './HabitEditor'
@@ -28,7 +30,16 @@ export function HabitsPage() {
   const [logging, setLogging] = useState<{ h: Habit; date: DateKey } | null>(null)
   const habits = useList('habits', { order: [{ field: 'sort_order' }, { field: 'created_at' }] })
   const checkins = useList('habit_checkins', { filters: [gte('date', addDays(today, -400))] })
+  const goals = useList('goals')
   const invalidate = useInvalidate()
+  const focusId = params.get('habit')
+
+  // Deep link: /habits?habit=<id> scrolls to that habit (switching to Archived if needed).
+  const focused = (habits.data ?? []).find((h) => h.id === focusId)
+  useEffect(() => {
+    if (focused) setTab(focused.archived_at ? 'archived' : 'active')
+  }, [focused?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useScrollIntoView(focused ? `habit-${focused.id}` : null, !!focused)
 
   useEffect(() => {
     if (params.get('new') === '1') {
@@ -100,6 +111,8 @@ export function HabitsPage() {
               key={h.id}
               habit={h}
               checkins={all}
+              focused={h.id === focusId}
+              goal={(goals.data ?? []).find((g) => g.id === h.goal_id)}
               onLog={(date) => setLogging({ h, date })}
               menu={
                 <Menu
@@ -124,7 +137,7 @@ export function HabitsPage() {
   )
 }
 
-function HabitCard({ habit: h, checkins, onLog, menu }: { habit: Habit; checkins: HabitCheckin[]; onLog: (d: DateKey) => void; menu: React.ReactNode }) {
+function HabitCard({ habit: h, checkins, focused, goal, onLog, menu }: { habit: Habit; checkins: HabitCheckin[]; focused: boolean; goal?: Goal; onLog: (d: DateKey) => void; menu: React.ReactNode }) {
   const { today, settings } = useSettings()
   const actions = useHabitActions()
   const [showHistory, setShowHistory] = useState(false)
@@ -139,7 +152,7 @@ function HabitCard({ habit: h, checkins, onLog, menu }: { habit: Habit; checkins
   }
 
   return (
-    <li className="rounded-xl border border-line bg-surface p-4">
+    <li id={`habit-${h.id}`} className={cn('rounded-xl border border-line bg-surface p-4', focused && 'ring-2 ring-accent')}>
       <div className="flex items-start gap-3">
         <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ background: h.color }} aria-hidden />
         <div className="min-w-0 flex-1">
@@ -149,6 +162,11 @@ function HabitCard({ habit: h, checkins, onLog, menu }: { habit: Habit; checkins
             {h.kind === 'numeric' && ` · ${h.target_value} ${h.unit}`.trimEnd()}
             {h.reminder_time && ` · reminder ${h.reminder_time.slice(0, 5)}`}
           </p>
+          {goal && (
+            <Link to={linkTo.goal(goal.id)} className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline">
+              <Target className="h-3 w-3" aria-hidden /> {goal.title}
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-4 text-right text-xs text-muted">
           <span className="flex items-center gap-1" title="Current streak">

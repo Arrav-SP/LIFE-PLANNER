@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useList } from '@/lib/db/hooks'
 import { useSettings } from '@/settings/SettingsProvider'
 import { formatInstant } from '@/lib/dates'
+import { linkTo } from '@/lib/links'
 import { Input } from '@/components/ui/Field'
 import { EmptyState, PageHeader } from '@/components/ui/misc'
 
@@ -37,6 +38,7 @@ export function SearchPage() {
   const projects = useList('projects')
   const habits = useList('habits')
   const subjects = useList('subjects')
+  const topics = useList('study_topics')
 
   const groups = useMemo(() => {
     if (needle.length < 2) return []
@@ -50,16 +52,21 @@ export function SearchPage() {
         .sort((a, b) => b.score - a.score)
         .slice(0, 20)
     const out: { label: string; icon: LucideIcon; hits: Hit[] }[] = [
-      { label: 'Tasks', icon: CheckSquare, hits: pick(tasks.data, (t) => ({ key: t.id, title: t.title, sub: [t.status === 'done' ? 'Done' : t.due_date ?? 'No date', ...t.tags.map((x) => `#${x}`)].join(' · '), to: `/tasks?view=all&task=${t.id}`, rest: `${t.description} ${t.notes} ${t.tags.join(' ')}` })) },
-      { label: 'Events', icon: CalendarDays, hits: pick(events.data, (e) => ({ key: e.id, title: e.title, sub: formatInstant(e.start_at, tz, 'd MMM yyyy, HH:mm') + (e.location ? ` · ${e.location}` : ''), to: `/calendar?event=${e.id}`, rest: `${e.description} ${e.location} ${e.notes}` })) },
-      { label: 'Notes', icon: StickyNote, hits: pick(notes.data, (n) => ({ key: n.id, title: n.title || 'Untitled', sub: n.status, to: '/inbox', rest: `${n.content} ${n.url} ${n.tags.join(' ')}` })) },
-      { label: 'Goals', icon: Target, hits: pick(goals.data, (g) => ({ key: g.id, title: g.title, sub: g.status, to: `/goals?goal=${g.id}`, rest: `${g.description} ${g.notes}` })) },
-      { label: 'Projects', icon: FolderKanban, hits: pick(projects.data, (p) => ({ key: p.id, title: p.name, sub: p.status.replace('_', ' '), to: `/projects?project=${p.id}`, rest: `${p.description} ${p.notes}` })) },
-      { label: 'Habits', icon: Repeat, hits: pick(habits.data, (h) => ({ key: h.id, title: h.name, sub: h.archived_at ? 'Archived' : 'Active', to: '/habits', rest: h.description })) },
-      { label: 'Study', icon: BookOpen, hits: pick(subjects.data, (s) => ({ key: s.id, title: s.name, sub: s.kind, to: '/study', rest: s.description })) },
+      { label: 'Tasks', icon: CheckSquare, hits: pick(tasks.data, (t) => ({ key: t.id, title: t.title, sub: [t.status === 'done' ? 'Done' : t.due_date ?? 'No date', ...t.tags.map((x) => `#${x}`)].join(' · '), to: linkTo.task(t.id), rest: `${t.description} ${t.notes} ${t.tags.join(' ')}` })) },
+      { label: 'Events', icon: CalendarDays, hits: pick(events.data, (e) => ({ key: e.id, title: e.title, sub: formatInstant(e.start_at, tz, 'd MMM yyyy, HH:mm') + (e.location ? ` · ${e.location}` : ''), to: linkTo.event(e.id), rest: `${e.description} ${e.location} ${e.notes}` })) },
+      { label: 'Notes', icon: StickyNote, hits: pick(notes.data, (n) => ({ key: n.id, title: n.title || 'Untitled', sub: n.status, to: linkTo.note(n.id), rest: `${n.content} ${n.url} ${n.tags.join(' ')}` })) },
+      { label: 'Goals', icon: Target, hits: pick(goals.data, (g) => ({ key: g.id, title: g.title, sub: g.status, to: linkTo.goal(g.id), rest: `${g.description} ${g.notes}` })) },
+      { label: 'Projects', icon: FolderKanban, hits: pick(projects.data, (p) => ({ key: p.id, title: p.name, sub: p.status.replace('_', ' '), to: linkTo.project(p.id), rest: `${p.description} ${p.notes}` })) },
+      { label: 'Habits', icon: Repeat, hits: pick(habits.data, (h) => ({ key: h.id, title: h.name, sub: h.archived_at ? 'Archived' : 'Active', to: linkTo.habit(h.id), rest: h.description })) },
+      { label: 'Study', icon: BookOpen, hits: pick(subjects.data, (s) => ({ key: s.id, title: s.name, sub: s.kind, to: linkTo.subject(s.id), rest: s.description })) },
+      {
+        label: 'Study topics',
+        icon: BookOpen,
+        hits: pick(topics.data, (t) => ({ key: t.id, title: t.title, sub: (subjects.data ?? []).find((s) => s.id === t.subject_id)?.name ?? '', to: linkTo.subject(t.subject_id), rest: '' })),
+      },
     ]
     return out.filter((g) => g.hits.length)
-  }, [needle, tasks.data, events.data, notes.data, goals.data, projects.data, habits.data, subjects.data, tz])
+  }, [needle, tasks.data, events.data, notes.data, goals.data, projects.data, habits.data, subjects.data, topics.data, tz])
 
   return (
     <div className="mx-auto max-w-3xl">

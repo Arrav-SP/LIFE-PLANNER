@@ -9,7 +9,9 @@ import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field'
 import { ColorPicker } from '@/components/ColorPicker'
 import { RecurrenceEditor } from '@/components/RecurrenceEditor'
 import { useSettings } from '@/settings/SettingsProvider'
+import { Link } from 'react-router-dom'
 import { useLookups } from '@/lib/lookups'
+import { linkTo } from '@/lib/links'
 import { addDays, dateKey, formatTime, timeOf, zonedToInstant } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { REMINDER_CHOICES } from '@/features/tasks/TaskEditor'
@@ -247,7 +249,7 @@ export function EventEditor({
             <Field label="Tags" htmlFor="e-tags" hint="Comma separated">
               <Input id="e-tags" {...register('tags')} />
             </Field>
-            <Field label="Project" htmlFor="e-proj">
+            <Field label="Project" htmlFor="e-proj" hint={ev?.project_id && ev?.project_id === v.project_id ? <Link to={linkTo.project(ev?.project_id)} className="text-accent hover:underline">Open project</Link> : undefined}>
               <Select id="e-proj" {...register('project_id')}>
                 <option value="">None</option>
                 {lookups.projects.map((p) => (
@@ -257,7 +259,7 @@ export function EventEditor({
                 ))}
               </Select>
             </Field>
-            <Field label="Goal" htmlFor="e-goal">
+            <Field label="Goal" htmlFor="e-goal" hint={ev?.goal_id && ev?.goal_id === v.goal_id ? <Link to={linkTo.goal(ev?.goal_id)} className="text-accent hover:underline">Open goal</Link> : undefined}>
               <Select id="e-goal" {...register('goal_id')}>
                 <option value="">None</option>
                 {lookups.goals.map((g) => (
