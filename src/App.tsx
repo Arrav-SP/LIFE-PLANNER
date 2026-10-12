@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from 'react'
+import { Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/auth/AuthProvider'
@@ -11,6 +11,7 @@ import { ListSkeleton } from '@/components/ui/misc'
 import { useReminderEngine } from '@/features/reminders/ReminderCenter'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { OfflineSync } from '@/features/offline/OfflineSync'
+import { refreshPushSubscription } from '@/lib/push'
 import { PAGES } from './pages'
 
 export const queryClient = new QueryClient({
@@ -23,6 +24,10 @@ export const queryClient = new QueryClient({
 
 function Engine() {
   useReminderEngine()
+  const { user } = useAuth()
+  useEffect(() => {
+    if (user) void refreshPushSubscription().catch(() => undefined)
+  }, [user])
   return null
 }
 
