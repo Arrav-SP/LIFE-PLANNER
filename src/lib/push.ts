@@ -26,15 +26,53 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   return (await reg?.pushManager.getSubscription()) ?? null
 }
 
-export async function subscribePush(): Promise<void> {
-  const reg = await navigator.serviceWorker.ready
-  const perm = await Notification.requestPermission()
-  if (perm !== 'granted') throw new Error('Notifications are not allowed for this site.')
-  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(env.vapidPublicKey) as BufferSource }))
+function sameKey(a: ArrayBuffer | null | undefined, b: Uint8Array): boolean {
+  if (!a) return true // the browser doesn't say; assume it matches
+  const x = new Uint8Array(a)
+  return x.length === b.length && x.every((v, i) => v === b[i])
+}
+
+/**
+ * This device's push subscription, created if needed, made with the current
+ * VAPID key, and saved on the server so the push function can reach it.
+ */
+async function ensureSubscription(reg: ServiceWorkerRegistration, create: boolean): Promise<PushSubscription | null> {
+  const key = urlBase64ToUint8Array(env.vapidPublicKey)
+  let sub = await reg.pushManager.getSubscription()
+  // A subscription made with an older key is rejected by the push service: replace it.
+  if (sub && !sameKey(sub.options?.applicationServerKey, key)) {
+    await getStore()
+      .removeWhere('push_subscriptions', [eq('endpoint', sub.endpoint)])
+      .catch(() => undefined)
+    await sub.unsubscribe()
+    sub = null
+    create = true
+  }
+  if (!sub && create) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key as BufferSource })
+  if (!sub) return null
   const store = getStore()
   const existing = await store.list('push_subscriptions', { filters: [eq('endpoint', sub.endpoint)] })
   if (!existing.length)
     await store.insert('push_subscriptions', { endpoint: sub.endpoint, p256dh: toB64(sub.getKey('p256dh')), auth: toB64(sub.getKey('auth')), user_agent: navigator.userAgent.slice(0, 300) })
+  return sub
+}
+
+export async function subscribePush(): Promise<void> {
+  const reg = await navigator.serviceWorker.ready
+  const perm = await Notification.requestPermission()
+  if (perm !== 'granted') throw new Error('Notifications are not allowed for this site.')
+  await ensureSubscription(reg, true)
+}
+
+/**
+ * Run on app start: if this device has push on, make sure the server still
+ * knows about it (it forgets subscriptions the browser dropped) and that it
+ * uses the current key.
+ */
+export async function refreshPushSubscription(): Promise<void> {
+  if (!pushAvailable().ok || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  const reg = await navigator.serviceWorker.getRegistration()
+  if (reg) await ensureSubscription(reg, false)
 }
 
 export async function unsubscribePush(): Promise<void> {
