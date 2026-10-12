@@ -158,6 +158,13 @@ describe('runReminderJob', () => {
     expect(logs[0].status).toBe('failed')
   })
 
+  it('logs why the push service refused a message', async () => {
+    const { db, logs } = fakeDb([due()])
+    await runReminderJob(db, async () => ({ failed: 'Push service said 403 (VAPID keys do not match the app key): bad jwt' }), at('2026-10-12T01:30:20Z'))
+    expect(logs[0].status).toBe('failed')
+    expect(logs[0].detail).toContain('403')
+  })
+
   it('ignores reminders more than six hours late', async () => {
     const { db, reminders } = fakeDb([due()])
     expect(await runReminderJob(db, sendOk, at('2026-10-12T08:00:00Z'))).toEqual({ due: 0, sent: 0, scheduled: 0 })

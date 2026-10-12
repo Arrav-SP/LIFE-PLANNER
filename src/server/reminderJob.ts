@@ -55,7 +55,8 @@ export interface JobDb {
   removeReminders(userId: string, ids: string[]): Promise<void>
 }
 
-export type PushResult = 'ok' | 'gone' | 'failed'
+/** 'gone' = the browser dropped the subscription; `{ failed }` carries the push service's reason. */
+export type PushResult = 'ok' | 'gone' | 'failed' | { failed: string }
 export type SendPush = (sub: PushSubscriptionRow, payload: string) => Promise<PushResult>
 
 function minutesIn(tz: string, d: Date): number {
@@ -131,17 +132,20 @@ export async function runReminderJob(db: JobDb, send: SendPush, now: Date = new 
       } else {
         const payload = JSON.stringify({ title: r.title, body: r.body, url: r.url || '/', tag: r.dedupe_key })
         let delivered = false
+        const problems: string[] = []
         for (const s of subs) {
           const res = await send(s, payload)
           if (res === 'ok') delivered = true
+          else if (typeof res === 'object') problems.push(res.failed)
           if (res === 'gone') {
+            problems.push('A device had turned push off or reset it, so it was removed. Turn push on again on that device.')
             // The browser dropped this subscription; forget it.
             await db.deleteSubscription(s.id)
             subs = subs.filter((x) => x.id !== s.id)
           }
         }
         if (delivered) result.sent++
-        await db.log({ ...base, status: delivered ? 'delivered' : 'failed', detail: delivered ? '' : 'No subscription accepted the message' })
+        await db.log({ ...base, status: delivered ? 'delivered' : 'failed', detail: delivered ? '' : [...new Set(problems)].join(' ') || 'No subscription accepted the message' })
       }
       try {
         result.scheduled += await scheduleNext(db, r, ctx.timezone, now)
