@@ -175,7 +175,7 @@ export function ReminderCenter({ compact }: { compact?: boolean }) {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] animate-slide-up rounded-xl border border-line bg-surface shadow-pop">
+        <div className="fixed inset-x-3 top-[3.75rem] z-40 animate-slide-up rounded-xl border border-line bg-surface shadow-pop md:absolute md:inset-x-auto md:right-0 md:top-auto md:mt-2 md:w-[22rem]">
           <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
             <p className="text-sm font-semibold">Reminders</p>
             <Link to="/reminders" className="text-xs font-medium text-accent hover:underline" onClick={() => setOpen(false)}>
