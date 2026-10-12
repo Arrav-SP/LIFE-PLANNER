@@ -19,6 +19,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run functions:check
       - run: npm test
       - name: Database security tests
         run: PG_BIN=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1) npm run test:db

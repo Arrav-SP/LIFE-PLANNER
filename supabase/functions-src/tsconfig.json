@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "skipLibCheck": true,
+    "baseUrl": "../..",
+    "types": [],
+    "paths": {
+      "@/*": ["src/*"],
+      "npm:@supabase/supabase-js@2.46.1": ["node_modules/@supabase/supabase-js"]
+    }
+  },
+  "include": ["*.ts", "npm-shims.d.ts"]
+}
