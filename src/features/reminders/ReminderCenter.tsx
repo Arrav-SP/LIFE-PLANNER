@@ -10,13 +10,11 @@ import { formatTime, minutesOfDay } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { inQuietHours, showBrowserNotification } from './notify'
 import { rollForward } from './sync'
+import { localFireAt, reminderDueAt } from './plan'
+import { env } from '@/lib/env'
 
 const LOOKAHEAD_MS = 24 * 3600 * 1000
 const REFRESH_MS = 10 * 60 * 1000
-
-function dueAt(r: Reminder) {
-  return new Date(r.status === 'snoozed' && r.snoozed_until ? r.snoozed_until : r.remind_at).getTime()
-}
 
 /**
  * In-app reminder engine. While the app is open it schedules a timer for the
@@ -30,6 +28,8 @@ export function useReminderEngine() {
   const invalidate = useInvalidate()
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const firing = useRef(new Set<string>())
+  // Due reminders left to the push server, so we notice when it takes them.
+  const waiting = useRef(new Set<string>())
 
   const check = useCallback(async () => {
     if (!user) return
@@ -47,13 +47,27 @@ export function useReminderEngine() {
     } catch {
       return
     }
+    // With push set up, the server delivers to every device. An open tab that
+    // fired first would mark the reminder done and the phone would get nothing.
+    let serverPushes = false
+    if (env.mode === 'supabase' && env.vapidPublicKey && settings.notifications.push !== false && pending.some((r) => !r.push_sent_at)) {
+      try {
+        serverPushes = (await store.list('push_subscriptions', { limit: 1 })).length > 0
+      } catch {
+        serverPushes = false
+      }
+    }
     const now = Date.now()
-    const due = pending.filter((r) => dueAt(r) <= now)
+    const pendingIds = new Set(pending.map((r) => r.id))
+    const takenByServer = [...waiting.current].some((id) => !pendingIds.has(id))
+    waiting.current = new Set(pending.filter((r) => reminderDueAt(r) <= now && localFireAt(r, serverPushes) > now).map((r) => r.id))
+    const fireAt = (r: Reminder) => localFireAt(r, serverPushes)
+    const due = pending.filter((r) => fireAt(r) <= now)
     for (const r of due) {
       if (firing.current.has(r.id)) continue
       firing.current.add(r.id)
       // Ignore reminders that are long past (e.g. app closed for days): mark them missed quietly.
-      const stale = now - dueAt(r) > 6 * 3600 * 1000
+      const stale = now - reminderDueAt(r) > 6 * 3600 * 1000
       try {
         await store.update('reminders', r.id, { status: 'fired', fired_at: new Date().toISOString() })
       } catch {
@@ -84,14 +98,15 @@ export function useReminderEngine() {
       }
       await rollForward(r, tz).catch(() => undefined)
     }
-    if (due.length) {
+    if (due.length || takenByServer) {
       invalidate('reminders')
       invalidate('notification_log')
       void qc.invalidateQueries({ queryKey: ['reminders'] })
     }
-    const next = pending.filter((r) => dueAt(r) > now).map(dueAt).sort((a, b) => a - b)[0]
+    const next = pending.map(fireAt).filter((t) => t > now).sort((a, b) => a - b)[0]
     if (timer.current) clearTimeout(timer.current)
-    const wait = Math.min(next ? next - now + 250 : REFRESH_MS, REFRESH_MS)
+    // Re-check soon while the server owes a push, so the bell updates when it lands.
+    const wait = Math.min(next ? next - now + 250 : REFRESH_MS, waiting.current.size ? 30_000 : REFRESH_MS)
     timer.current = setTimeout(() => void check(), Math.max(1000, wait))
   }, [user, settings, tz, invalidate, qc])
 
@@ -112,7 +127,8 @@ export function useReminderEngine() {
 }
 
 export async function snoozeReminder(r: Reminder, minutes: number) {
-  await getStore().update('reminders', r.id, { status: 'snoozed', snoozed_until: new Date(Date.now() + minutes * 60000).toISOString() })
+  // Clearing push_sent_at lets the push server send it again when the snooze ends.
+  await getStore().update('reminders', r.id, { status: 'snoozed', snoozed_until: new Date(Date.now() + minutes * 60000).toISOString(), push_sent_at: null })
   window.dispatchEvent(new Event('lp:reminders-changed'))
 }
 

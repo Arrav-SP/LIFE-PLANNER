@@ -186,3 +186,20 @@ export function reconcileReminders(existing: Reminder[], next: PlannedReminder[]
   }
   return changes
 }
+
+/** When a reminder is due: its snooze time while snoozed, otherwise its planned time. */
+export function reminderDueAt(r: Pick<Reminder, 'status' | 'remind_at' | 'snoozed_until'>): number {
+  return Date.parse(r.status === 'snoozed' && r.snoozed_until ? r.snoozed_until : r.remind_at)
+}
+
+/**
+ * How long an open app leaves a due reminder to the push server. The server
+ * runs every minute; if an open tab marked the reminder as fired first, the
+ * server would skip it and phones would get nothing.
+ */
+export const PUSH_GRACE_MS = 3 * 60_000
+
+/** When an open app should go off for `r` itself. */
+export function localFireAt(r: Pick<Reminder, 'status' | 'remind_at' | 'snoozed_until' | 'push_sent_at'>, serverPushes: boolean): number {
+  return reminderDueAt(r) + (serverPushes && !r.push_sent_at ? PUSH_GRACE_MS : 0)
+}

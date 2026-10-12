@@ -96,9 +96,10 @@ Deno.serve(async (req) => {
     },
   }
 
+  // High urgency: Android otherwise holds pushes back while the phone is idle.
   const result = await runReminderJob(db, async (sub, payload) => {
     try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600 })
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: 'high' })
       return 'ok'
     } catch (e) {
       const code = (e as { statusCode?: number }).statusCode
