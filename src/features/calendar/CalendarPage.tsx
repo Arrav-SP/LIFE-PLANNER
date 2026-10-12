@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Checkbox } from '@/components/ui/Field'
 import { Segmented } from '@/components/ui/misc'
+import { toast } from '@/components/ui/toast'
 import { useTaskData } from '@/features/tasks/useTaskData'
 import { expandTasks, type TaskInstance } from '@/features/tasks/logic'
 import { useTaskActions } from '@/features/tasks/actions'
@@ -24,6 +25,7 @@ import { expandBlocks, expandEvents, findConflicts, type EventInstance } from '.
 import { useEventActions } from './actions'
 import { EventEditor, type EditorTarget } from './EventEditor'
 import { fromWall, toWall, wallKey } from './wall'
+import { useExternalCalendars } from './useExternalCalendars'
 
 type View = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek'
 const VIEWS: { value: View; label: string }[] = [
@@ -96,12 +98,15 @@ export function CalendarPage() {
     ).filter((i) => i.date && !i.skipped)
   }, [tasks, occurrences, range, tz, show.tasks])
 
+  const external = useExternalCalendars(range)
+
   const busy = useMemo(
     () => [
       ...instances.map((i) => ({ key: i.key, title: i.title, start: i.start, end: i.end, allDay: i.allDay })),
+      ...external.events.map((e) => ({ key: e.key, title: e.title, start: e.start, end: e.end, allDay: e.allDay })),
       ...blockInstances.map((b) => ({ key: b.instanceKey, title: b.title, start: b.start, end: b.end, allDay: false })),
     ],
-    [instances, blockInstances],
+    [instances, blockInstances, external.events],
   )
   const conflictKeys = useMemo(() => {
     const s = new Set<string>()
@@ -142,6 +147,20 @@ export function CalendarPage() {
         extendedProps: { kind: 'block' },
       })
     }
+    for (const e of external.events) {
+      out.push({
+        id: `ext:${e.key}`,
+        title: e.title,
+        start: e.allDay ? e.startKey : toWall(e.start, tz),
+        end: e.allDay ? e.endKey : toWall(e.end, tz),
+        allDay: e.allDay,
+        backgroundColor: e.link.color,
+        borderColor: e.link.color,
+        editable: false,
+        classNames: ['lp-external', ...(conflictKeys.has(e.key) ? ['lp-conflict'] : [])],
+        extendedProps: { kind: 'external', calendar: e.link.name, location: e.location },
+      })
+    }
     for (const t of taskInstances) {
       const timed = !!t.scheduledAt
       const start = timed ? new Date(t.scheduledAt!) : null
@@ -160,7 +179,7 @@ export function CalendarPage() {
       })
     }
     return out
-  }, [instances, blockInstances, taskInstances, conflictKeys, tz, settings.default_task_minutes])
+  }, [instances, blockInstances, external.events, taskInstances, conflictKeys, tz, settings.default_task_minutes])
 
   const nowFn = useCallback(() => toWall(new Date(), tz), [tz])
   const timeFormat = useMemo(() => ({ hour: 'numeric' as const, minute: '2-digit' as const, hour12: settings.time_format !== 'HH:mm' }), [settings.time_format])
@@ -196,6 +215,7 @@ export function CalendarPage() {
       else setEditor({ event: inst.event, instance: inst, scope: 'all' })
     } else if (kind === 'task') setTask(arg.event.extendedProps.inst as TaskInstance)
     else if (kind === 'block') navigate(`/planner?date=${wallKey(arg.event.start!)}`)
+    else if (kind === 'external') toast.info(`From ${arg.event.extendedProps.calendar as string}. Edit it in Google Calendar.`)
   }
 
   const onMove = async (arg: EventDropArg | EventResizeDoneArg) => {
@@ -253,6 +273,11 @@ export function CalendarPage() {
           <Checkbox checked={show.blocks} onChange={(v) => setShow((s) => ({ ...s, blocks: v }))} label="Show time blocks" /> Time blocks
         </label>
         {conflictKeys.size > 0 && <span className="text-danger">Red edge = overlapping items</span>}
+        {external.errors.map(({ link, error }) => (
+          <span key={link.id} className="text-danger">
+            {link.name}: {error?.message}
+          </span>
+        ))}
       </div>
       <div className="rounded-xl border border-line bg-surface p-2 md:p-3">
         <FullCalendar
