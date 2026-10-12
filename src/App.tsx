@@ -10,12 +10,14 @@ import { ConfirmHost } from '@/components/ui/Dialog'
 import { ListSkeleton } from '@/components/ui/misc'
 import { useReminderEngine } from '@/features/reminders/ReminderCenter'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { OfflineSync } from '@/features/offline/OfflineSync'
 import { PAGES } from './pages'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 },
-    mutations: { retry: 0 },
+    // 'always': without internet the store answers from this device's copy, so never pause.
+    queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1, networkMode: 'always' },
+    mutations: { retry: 0, networkMode: 'always' },
   },
 })
 
@@ -36,6 +38,7 @@ function Gate({ children }: { children: ReactNode }) {
   return (
     <SettingsProvider>
       <Engine />
+      <OfflineSync />
       {children}
     </SettingsProvider>
   )

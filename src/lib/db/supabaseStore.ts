@@ -11,7 +11,8 @@ function fail(error: PostgrestError | null, fallback: string): never {
   if (code === '23514') throw new StoreError('Some values are out of range. Check the form and try again.', code)
   if (code === '42501') throw new StoreError('Your session has expired. Sign in again to continue.', code)
   if (code === 'PGRST301' || code === 'PGRST303') throw new StoreError('Your session has expired. Sign in again to continue.', code)
-  if (error.message?.toLowerCase().includes('fetch')) throw new StoreError('You appear to be offline. Changes were not saved.', 'offline')
+  // Network failures: Chrome says "Failed to fetch", Safari "Load failed"; timeouts abort the request.
+  if (/fetch|network|load failed|timed? ?out|abort/i.test(error.message ?? '')) throw new StoreError('You appear to be offline.', 'offline')
   throw new StoreError(error.message || fallback, code)
 }
 

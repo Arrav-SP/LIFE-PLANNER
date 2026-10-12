@@ -21,6 +21,7 @@ It costs nothing to run. Every service below is used on its free tier, and none 
 | **Coach** | Ranks the ideal tasks for today against your free time, works out a study pace per subject from its goal deadline and your recent study, and points out what to change (overbooked days, overdue piles, slipping habits, goals behind, your best focus hours). It is plain arithmetic in the app with no AI service. "Copy for Claude" copies a summary you can paste into a chat for deeper advice. |
 | **Reminders** | In-app reminders, browser notifications while the app is open, and optional Web Push that works while the app is closed (see below). Quiet hours are respected. |
 | **Analytics and weekly review** | Charts for completed tasks, study hours, study by subject, habit consistency and goals. The weekly review records wins, misses and next week's priorities. |
+| **Offline** | With sync on, a copy of your data is kept on the device. Without internet you can still view and change everything; changes upload by themselves when you're back online, and a banner shows how many are waiting. |
 | **Everything else** | Search, keyboard shortcuts, light and dark themes, JSON and CSV export, JSON import, and account deletion. |
 
 **Keyboard shortcuts:** `q` or `n` opens quick add, `/` or `Ctrl/⌘ K` opens search, and `t`, `c` and `p` go to Today, Calendar and Planner.
@@ -126,7 +127,8 @@ npm run icons       # regenerate PWA icons
 ```
 src/
   features/      one folder per area (tasks, calendar, planner, habits, goals, study, fitness, notes, reminders, analytics, …)
-  lib/db/        data layer: SupabaseStore and LocalStore (IndexedDB) behind one interface, plus React Query hooks
+  lib/db/        data layer: SupabaseStore and LocalStore (IndexedDB) behind one interface, the OfflineStore that
+                 keeps a device copy and an outbox of offline changes, plus React Query hooks
   lib/           dates and time zones, recurrence, export/import, push helpers
   components/    shared UI and layout
 supabase/
@@ -150,6 +152,8 @@ e2e/             Playwright tests
 
 - Without push set up, reminders only fire while the app is open. The app never claims otherwise.
 - Push covers reminders that already exist. Repeating custom reminders schedule their next occurrence the next time you open the app.
+- Offline changes are merged with "last change wins". If the same item is edited on two devices while one is offline, the later upload replaces the earlier edit. A change the server refuses (for example, editing something already deleted on another device) is dropped and the app says so.
+- Opening the app for the first time on a device needs internet. Account deletion and "delete all data" also need internet.
 - iOS only delivers web notifications to a Home Screen–installed app on iOS 16.4+.
 - Natural-language quick add understands English phrases for dates, times, durations, repeats, `#tags` and `!priority`. Always check the preview.
 - Supabase's built-in email is rate-limited. See step 3 of the Supabase setup.
