@@ -491,6 +491,7 @@ function reconcileReminders(existing, next) {
   }
   return changes;
 }
+var PUSH_GRACE_MS = 3 * 6e4;
 
 // src/server/reminderJob.ts
 var STALE_MS = 6 * 3600 * 1e3;
@@ -645,7 +646,7 @@ Deno.serve(async (req) => {
   };
   const result = await runReminderJob(db, async (sub, payload) => {
     try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600 });
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
       return "ok";
     } catch (e) {
       const code = e.statusCode;
