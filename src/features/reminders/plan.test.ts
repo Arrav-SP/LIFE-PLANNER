@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarEvent, Habit, Reminder, Task } from '@/lib/db/types'
-import { afterFiring, planCustomNext, planEventReminders, planHabitReminders, planTaskReminders, reconcileReminders } from './plan'
+import { afterFiring, localFireAt, planCustomNext, planEventReminders, planHabitReminders, planTaskReminders, PUSH_GRACE_MS, reconcileReminders, reminderDueAt } from './plan'
 
 const TZ = 'Asia/Kolkata'
 const base = { user_id: 'u1', created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z' }
@@ -170,5 +170,28 @@ describe('reconcileReminders', () => {
     const existing = reminder({ id: 'a', dedupe_key: 'habit:h1:2026-10-13', remind_at: '2026-10-13T01:30:00+00:00' })
     const next = planHabitReminders(habit(), TZ, Date.parse('2026-10-12T02:00:00Z'))
     expect(reconcileReminders([existing], next)).toEqual({ remove: [], insert: [], update: [] })
+  })
+})
+
+describe('localFireAt', () => {
+  const at = '2026-10-12T09:00:00.000Z'
+  const base = { status: 'scheduled' as const, remind_at: at, snoozed_until: null, push_sent_at: null }
+
+  it('goes off on time when nothing will push it', () => {
+    expect(localFireAt(base, false)).toBe(Date.parse(at))
+  })
+
+  it('leaves the push server time to deliver to every device first', () => {
+    expect(localFireAt(base, true)).toBe(Date.parse(at) + PUSH_GRACE_MS)
+  })
+
+  it('does not wait for a push that already went out', () => {
+    expect(localFireAt({ ...base, push_sent_at: at }, true)).toBe(Date.parse(at))
+  })
+
+  it('uses the snooze time while snoozed', () => {
+    const until = '2026-10-12T09:10:00.000Z'
+    expect(reminderDueAt({ ...base, status: 'snoozed', snoozed_until: until })).toBe(Date.parse(until))
+    expect(localFireAt({ ...base, status: 'snoozed', snoozed_until: until }, true)).toBe(Date.parse(until) + PUSH_GRACE_MS)
   })
 })

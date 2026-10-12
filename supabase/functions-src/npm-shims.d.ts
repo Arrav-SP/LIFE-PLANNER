@@ -2,7 +2,7 @@
 declare module 'npm:web-push@3.6.7' {
   const webpush: {
     setVapidDetails(subject: string, publicKey: string, privateKey: string): void
-    sendNotification(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: string, options?: { TTL?: number }): Promise<unknown>
+    sendNotification(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: string, options?: { TTL?: number; urgency?: 'very-low' | 'low' | 'normal' | 'high' }): Promise<unknown>
   }
   export default webpush
 }
