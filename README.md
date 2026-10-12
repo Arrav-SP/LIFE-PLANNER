@@ -85,7 +85,7 @@ The app is a PWA and needs the deployed HTTPS URL.
 
 ## 5. Optional: notifications while the app is closed (Web Push)
 
-Browser timers stop when the app is closed, so in-app and browser reminders only fire while the app is open. To be notified while it is closed, set up push. It is also free: once a minute comes to about 43,000 function calls a month, against a free limit of 500,000.
+Browser timers stop when the app is closed, so in-app and browser reminders only fire while the app is open. To be notified while it is closed, set up push. The same function also schedules the next reminder for anything that repeats (habits, repeating tasks and events, and repeating custom reminders), so they keep coming without opening the app. It is also free: once a minute comes to about 43,000 function calls a month, against a free limit of 500,000.
 
 1. Generate VAPID keys once: `npx web-push generate-vapid-keys`.
 2. Add the **public** key to the frontend as `VITE_VAPID_PUBLIC_KEY`, both locally and in Vercel/Netlify.
@@ -96,6 +96,7 @@ Browser timers stop when the app is closed, so in-app and browser reminders only
    ```
 
 4. Deploy the function: `npx supabase functions deploy send-due-reminders --no-verify-jwt`. The function checks `CRON_SECRET` itself.
+   Without the CLI, create a function named `send-due-reminders` in the dashboard (Edge Functions → Deploy a new function → Via Editor), paste the whole of `supabase/functions/send-due-reminders/index.ts`, and turn off **Verify JWT** in its settings.
 5. Open `supabase/optional/push_cron.sql`, replace `YOUR-PROJECT-REF` and `YOUR-CRON-SECRET`, and run it in the SQL Editor. Don't commit the edited file.
 6. In the app, go to Settings → Notifications and turn on push for this device.
 
@@ -118,6 +119,7 @@ npm test            # unit and component tests (Vitest)
 npm run test:e2e    # browser tests on desktop and phone (Playwright, local mode)
 npm run test:db     # row-level security tests against a throwaway local Postgres
 npm run icons       # regenerate PWA icons
+npm run functions:build  # bundle supabase/functions-src into supabase/functions
 ```
 
 `test:db` needs PostgreSQL 15+ binaries installed (`initdb`, `pg_ctl`). Set `PG_BIN` if they aren't on your `PATH`. It starts a temporary database on port 54329, loads the migration, and checks that one user can never read or change another user's rows.
@@ -130,10 +132,12 @@ src/
   lib/db/        data layer: SupabaseStore and LocalStore (IndexedDB) behind one interface, the OfflineStore that
                  keeps a device copy and an outbox of offline changes, plus React Query hooks
   lib/           dates and time zones, recurrence, export/import, push helpers
+  server/        server-side jobs shared with the Edge Functions (tested with Vitest)
   components/    shared UI and layout
 supabase/
   migrations/    the full schema with RLS
-  functions/     send-due-reminders (optional push)
+  functions/     deployable Edge Functions (generated; do not edit)
+  functions-src/ their source, bundled by `npm run functions:build`
   optional/      push_cron.sql
 db/tests/        RLS tests
 e2e/             Playwright tests
@@ -150,8 +154,7 @@ e2e/             Playwright tests
 
 ## Known limitations
 
-- Without push set up, reminders only fire while the app is open. The app never claims otherwise.
-- Push covers reminders that already exist. Repeating custom reminders schedule their next occurrence the next time you open the app.
+- Without push set up, reminders only fire while the app is open, and repeating reminders schedule their next occurrence when you open the app. The app never claims otherwise.
 - Offline changes are merged with "last change wins". If the same item is edited on two devices while one is offline, the later upload replaces the earlier edit. A change the server refuses (for example, editing something already deleted on another device) is dropped and the app says so.
 - Opening the app for the first time on a device needs internet. Account deletion and "delete all data" also need internet.
 - iOS only delivers web notifications to a Home Screen–installed app on iOS 16.4+.
