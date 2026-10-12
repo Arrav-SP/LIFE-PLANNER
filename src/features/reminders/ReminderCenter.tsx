@@ -6,56 +6,16 @@ import { getStore, type Reminder } from '@/lib/db'
 import { useList, useInvalidate } from '@/lib/db/hooks'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useAuth } from '@/auth/AuthProvider'
-import { addDays, dateKey, formatTime, minutesOfDay, timeOf, zonedToInstant } from '@/lib/dates'
-import { nextOccurrence } from '@/lib/recurrence'
+import { formatTime, minutesOfDay } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { inQuietHours, showBrowserNotification } from './notify'
-import { syncEventReminders, syncHabitReminders, syncTaskReminders } from './sync'
+import { rollForward } from './sync'
 
 const LOOKAHEAD_MS = 24 * 3600 * 1000
 const REFRESH_MS = 10 * 60 * 1000
 
 function dueAt(r: Reminder) {
   return new Date(r.status === 'snoozed' && r.snoozed_until ? r.snoozed_until : r.remind_at).getTime()
-}
-
-/** After a reminder for a repeating source fires, schedule the next one. */
-async function rollForward(r: Reminder, tz: string) {
-  const store = getStore()
-  if (!r.source_id && r.source_type !== 'custom') return
-  if (r.source_type === 'task' && r.source_id) {
-    const t = await store.get('tasks', r.source_id)
-    if (t?.recurrence) await syncTaskReminders(t, tz)
-  } else if (r.source_type === 'event' && r.source_id) {
-    const e = await store.get('events', r.source_id)
-    if (e?.recurrence) await syncEventReminders(e, tz)
-  } else if (r.source_type === 'habit' && r.source_id) {
-    const h = await store.get('habits', r.source_id)
-    if (h) await syncHabitReminders(h, tz)
-  } else if (r.source_type === 'custom' && r.recurrence) {
-    // Custom repeating reminders keep their wall-clock time in the user's zone.
-    const fired = new Date(r.remind_at)
-    const startKey = r.occurrence_key || dateKey(fired, tz)
-    const next = nextOccurrence(r.recurrence, startKey, addDays(dateKey(fired, tz), 1))
-    if (next) {
-      const when = zonedToInstant(next, timeOf(fired, tz), tz)
-      try {
-        await store.insert('reminders', {
-          source_type: 'custom',
-          source_id: null,
-          occurrence_key: startKey,
-          title: r.title,
-          body: r.body,
-          url: r.url,
-          remind_at: when.toISOString(),
-          recurrence: r.recurrence,
-          dedupe_key: `custom:${r.dedupe_key.split(':')[1] ?? r.id}:${next}`,
-        })
-      } catch {
-        /* already scheduled by another tab */
-      }
-    }
-  }
 }
 
 /**
