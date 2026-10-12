@@ -86,17 +86,14 @@ export function Checkbox({
   )
 }
 
+/** An on/off toggle with its label shown next to it. The whole row is clickable. */
 export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', checked ? 'bg-accent' : 'bg-line')}
-    >
-      <span className={cn('absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-5' : 'translate-x-0.5')} />
+    <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="group flex max-w-full items-center gap-3 text-left text-sm">
+      <span aria-hidden className={cn('relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors', checked ? 'bg-accent' : 'bg-line')}>
+        <span className={cn('h-5 w-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-5' : 'translate-x-0')} />
+      </span>
+      <span className="min-w-0">{label}</span>
     </button>
   )
 }
