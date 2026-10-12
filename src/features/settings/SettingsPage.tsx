@@ -5,9 +5,10 @@ import { useSettings } from '@/settings/SettingsProvider'
 import { useAuth } from '@/auth/AuthProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
 import { getStore } from '@/lib/db'
+import { eq } from '@/lib/db/store'
 import { TABLES, type TableName, type UserSettings } from '@/lib/db/types'
 import { browserTimeZone, formatInstant, isValidTimeZone, WEEKDAY_LONG } from '@/lib/dates'
-import { cn, COLOR_SWATCHES, errorMessage } from '@/lib/utils'
+import { cn, COLOR_SWATCHES, errorMessage, plural } from '@/lib/utils'
 import { env } from '@/lib/env'
 import { useScrollIntoView } from '@/lib/useScrollIntoView'
 import { Button } from '@/components/ui/Button'
@@ -259,7 +260,7 @@ function NotificationSettings({ notif }: { notif: (p: Partial<UserSettings['noti
   )
   return (
     <section id="notifications">
-      <Panel id="notifications" title="Notifications">
+      <Panel title="Notifications">
         <div className="flex flex-col gap-4">
           <Switch checked={settings.notifications.in_app !== false} onChange={(v) => notif({ in_app: v })} label="Show reminders inside the app" />
           <div className="flex flex-wrap items-center gap-3">
@@ -299,9 +300,12 @@ function NotificationSettings({ notif }: { notif: (p: Partial<UserSettings['noti
             />
             {!avail.ok && <p className="mt-1 text-xs text-muted">{avail.reason}</p>}
             {avail.ok && pushOn && (
-              <Button variant="outline" size="sm" className="mt-2" onClick={() => void sendTestPush()}>
-                Send a test notification
-              </Button>
+              <>
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => void sendTestPush()}>
+                  Send a test notification
+                </Button>
+                <PushCheck />
+              </>
             )}
           </div>
           <Switch checked={settings.notifications.habit_reminders !== false} onChange={(v) => notif({ habit_reminders: v })} label="Habit reminders" />
@@ -310,6 +314,44 @@ function NotificationSettings({ notif }: { notif: (p: Partial<UserSettings['noti
         </div>
       </Panel>
     </section>
+  )
+}
+
+/** What the server knows about push for this account, so a missing notification can be traced. */
+function PushCheck() {
+  const { tz, settings } = useSettings()
+  const subs = useList('push_subscriptions')
+  const last = useList('notification_log', { filters: [eq('channel', 'push')], order: [{ field: 'created_at', ascending: false }], limit: 1 })
+  const [endpoint, setEndpoint] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    void currentSubscription().then((s) => setEndpoint(s?.endpoint ?? null))
+  }, [subs.data])
+  if (subs.isLoading || last.isLoading || endpoint === undefined) return null
+  const saved = !!endpoint && (subs.data ?? []).some((x) => x.endpoint === endpoint)
+  const l = last.data?.[0]
+  const when = l ? formatInstant(l.created_at, tz, `d MMM, ${settings.time_format}`) : ''
+  const lines: { tone: 'ok' | 'warn'; text: string }[] = [
+    saved
+      ? { tone: 'ok', text: `This device is saved on the server (${plural((subs.data ?? []).length, 'device')} with push in total).` }
+      : { tone: 'warn', text: 'This device is not saved on the server, so pushes cannot reach it. Turn the switch above off and on again.' },
+    !l
+      ? { tone: 'warn', text: 'The server has not sent any push yet. If the test does not arrive within 2 minutes, the push function or its every-minute schedule is not running: check Supabase → Edge Functions → send-due-reminders → Logs.' }
+      : l.status === 'delivered'
+        ? { tone: 'ok', text: `Last push accepted by the push service: “${l.title}” at ${when}. If it did not show, check the phone's notification settings for Chrome and Life Planner, and battery saver.` }
+        : { tone: 'warn', text: `Last push (“${l.title}”, ${when}) ${l.status === 'suppressed' ? 'was held back' : 'failed'}: ${l.detail || 'no reason given'}` },
+  ]
+  return (
+    <div className="mt-3 rounded-lg border border-line bg-surface-2 p-3 text-xs" aria-label="Push check">
+      <p className="mb-1.5 font-semibold">Push check</p>
+      <ul className="flex flex-col gap-1.5">
+        {lines.map((x) => (
+          <li key={x.text} className={cn(x.tone === 'warn' ? 'text-warning' : 'text-muted')}>
+            {x.tone === 'warn' ? '⚠ ' : '✓ '}
+            {x.text}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

@@ -566,16 +566,19 @@ async function runReminderJob(db, send, now = /* @__PURE__ */ new Date()) {
       } else {
         const payload = JSON.stringify({ title: r.title, body: r.body, url: r.url || "/", tag: r.dedupe_key });
         let delivered = false;
+        const problems = [];
         for (const s of subs) {
           const res = await send(s, payload);
           if (res === "ok") delivered = true;
+          else if (typeof res === "object") problems.push(res.failed);
           if (res === "gone") {
+            problems.push("A device had turned push off or reset it, so it was removed. Turn push on again on that device.");
             await db.deleteSubscription(s.id);
             subs = subs.filter((x) => x.id !== s.id);
           }
         }
         if (delivered) result.sent++;
-        await db.log({ ...base, status: delivered ? "delivered" : "failed", detail: delivered ? "" : "No subscription accepted the message" });
+        await db.log({ ...base, status: delivered ? "delivered" : "failed", detail: delivered ? "" : [...new Set(problems)].join(" ") || "No subscription accepted the message" });
       }
       try {
         result.scheduled += await scheduleNext(db, r, ctx.timezone, now);
@@ -663,8 +666,10 @@ Deno.serve(async (req) => {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
       return "ok";
     } catch (e) {
-      const code = e.statusCode;
-      return code === 404 || code === 410 ? "gone" : "failed";
+      const err = e;
+      if (err.statusCode === 404 || err.statusCode === 410) return "gone";
+      const hint = err.statusCode === 401 || err.statusCode === 403 ? " (VAPID keys do not match the app key)" : "";
+      return { failed: `Push service said ${err.statusCode ?? "error"}${hint}: ${String(err.body || err.message || "").slice(0, 160)}` };
     }
   });
   return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
