@@ -3,6 +3,8 @@ import type { Session } from '@supabase/supabase-js'
 import { env } from '@/lib/env'
 import { getSupabase } from '@/lib/supabase'
 import { LOCAL_USER_ID } from '@/lib/db/localStore'
+import { getOfflineStore } from '@/lib/db'
+import { isOnline, storedUser } from '@/lib/session'
 
 export interface AuthUser {
   id: string
@@ -34,28 +36,58 @@ function friendly(msg: string): string {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
+  // Signed in on this device but the session can't be refreshed (offline): keep using the app.
+  const [offlineUser, setOfflineUser] = useState<AuthUser | null>(null)
   const [ready, setReady] = useState(env.mode === 'local')
 
   useEffect(() => {
     const sb = getSupabase()
     if (!sb) return
     let alive = true
-    sb.auth.getSession().then(({ data }) => {
-      if (!alive) return
-      setSession(data.session)
-      setReady(true)
+    let settled = false
+    const load = () =>
+      sb.auth.getSession().then(({ data, error }) => {
+        settled = true
+        if (!alive) return
+        setSession(data.session)
+        const offline = !data.session && error ? storedUser() : null
+        setOfflineUser(offline)
+        if (offline) getOfflineStore()?.markUnreachable()
+        setReady(true)
+      })
+    void load()
+    // Refreshing an expired session keeps retrying for a while without internet.
+    // Don't make the user wait for it: open the app with the saved session.
+    const fallback = setTimeout(
+      () => {
+        if (settled || !alive) return
+        const saved = storedUser()
+        if (!saved) return
+        setOfflineUser(saved)
+        getOfflineStore()?.markUnreachable()
+        setReady(true)
+      },
+      isOnline() ? 2500 : 0,
+    )
+    const { data } = sb.auth.onAuthStateChange((event, s) => {
+      setSession(s)
+      if (s || event === 'SIGNED_OUT') setOfflineUser(null)
     })
-    const { data } = sb.auth.onAuthStateChange((_e, s) => setSession(s))
+    // Back online: refresh the saved session.
+    const onOnline = () => void load()
+    window.addEventListener('online', onOnline)
     return () => {
       alive = false
+      clearTimeout(fallback)
       data.subscription.unsubscribe()
+      window.removeEventListener('online', onOnline)
     }
   }, [])
 
   const value = useMemo<AuthState>(() => {
     const sb = getSupabase()
     const user: AuthUser | null =
-      env.mode === 'local' ? { id: LOCAL_USER_ID, email: null } : session?.user ? { id: session.user.id, email: session.user.email ?? null } : null
+      env.mode === 'local' ? { id: LOCAL_USER_ID, email: null } : session?.user ? { id: session.user.id, email: session.user.email ?? null } : offlineUser
     return {
       mode: env.mode,
       ready,
@@ -83,10 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         if (!sb) return
-        await sb.auth.signOut()
+        const id = user?.id
+        // Offline, the server can't be told; forget the session on this device only.
+        const { error } = await sb.auth.signOut(isOnline() ? undefined : { scope: 'local' })
+        if (error) await sb.auth.signOut({ scope: 'local' })
+        setOfflineUser(null)
+        // Keep this device's copy only if it still has changes to upload.
+        if (id) await getOfflineStore()?.forgetDevice(id).catch(() => undefined)
       },
     }
-  }, [session, ready])
+  }, [session, offlineUser, ready])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
