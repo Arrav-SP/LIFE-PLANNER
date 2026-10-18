@@ -142,7 +142,7 @@ export function DashboardPage() {
           </span>
         }
         action={
-          <Link to="/planner" className="text-xs font-medium text-accent hover:underline">
+          <Link to={linkTo.planner(today)} className="text-xs font-medium text-accent hover:underline">
             Plan day
           </Link>
         }

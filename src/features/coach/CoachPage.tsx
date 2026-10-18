@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, Bot, CalendarCheck, Check, Copy, Lightbulb, Sparkles, ThumbsUp, Wand2, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Bot, CalendarCheck, Copy, Lightbulb, Sparkles, ThumbsUp, Wand2, X } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
 import { getStore } from '@/lib/db'
@@ -21,8 +21,6 @@ import { goalProgress, onTrack } from '@/features/goals/logic'
 import { habitRates } from '@/features/analytics/logic'
 import { expandBlocks, expandEvents } from '@/features/calendar/logic'
 import { dayWindow, placeAll } from '@/features/planner/logic'
-import { habitStats } from '@/features/habits/logic'
-import { useHabitActions } from '@/features/habits/actions'
 import {
   buildInsights,
   coachSummary,
@@ -114,7 +112,6 @@ export function CoachPage() {
   const exceptions = useList('event_exceptions')
   const blocks = useList('time_blocks')
   const { bulk, update } = useTaskActions()
-  const habitActions = useHabitActions()
 
   // Free time: the gaps left today between events and planner blocks, within the day hours in Settings.
   const now = new Date()
@@ -187,11 +184,6 @@ export function CoachPage() {
     studyLastWeek,
   })
 
-  const habitsLeft = (habits.data ?? []).filter((h) => {
-    const st = habitStats(h, checkins.data ?? [], today, settings.week_start)
-    return st.dueToday && !st.doneToday
-  })
-
   const picksMinutes = suggestions.picks.reduce((t, s) => t + s.minutes, 0)
   const movable = suggestions.picks.flatMap((s) => (s.kind === 'task' && !s.instance.task.recurrence && s.instance.date !== today ? [s.instance] : []))
 
@@ -262,7 +254,7 @@ export function CoachPage() {
       }
       toast.success(`Planned ${placed.length} item${placed.length === 1 ? '' : 's'} into today${unplaced.length ? `; ${unplaced.length} didn't fit` : ''}.`, {
         label: 'Open planner',
-        onClick: () => navigate(`/planner?date=${today}`),
+        onClick: () => navigate(linkTo.planner(today)),
       })
     } catch (e) {
       toast.error(errorMessage(e))
@@ -275,25 +267,9 @@ export function CoachPage() {
   const openPick = (s: Suggestion) => (s.kind === 'task' ? setOpenTask(s.instance) : navigate(linkTo.subject(s.subject.id)))
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <PageHeader
-        title="Coach"
-        subtitle="Suggestions worked out from your own tasks, study and habits."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {env.mode === 'supabase' && (
-              <Button onClick={() => void askCoach()} disabled={ai.loading}>
-                <Bot className="h-4 w-4" /> {ai.loading ? 'Thinking…' : 'Ask the coach'}
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => void copyForClaude()}>
-              <Copy className="h-4 w-4" /> Copy for Claude
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+    <div className="mx-auto flex max-w-5xl flex-col gap-3">
+      <PageHeader title="Coach" subtitle="Suggestions worked out from your own tasks, study and habits." />
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         <label htmlFor="coach-hours" className="text-muted">
           Free time today
         </label>
@@ -315,6 +291,16 @@ export function CoachPage() {
             Use my calendar ({formatMinutes(free.minutes) || '0m'})
           </button>
         )}
+        <div className="ml-auto flex flex-wrap gap-2">
+          {env.mode === 'supabase' && (
+            <Button size="sm" onClick={() => void askCoach()} disabled={ai.loading}>
+              <Bot className="h-4 w-4" /> {ai.loading ? 'Thinking…' : 'Ask the coach'}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => void copyForClaude()}>
+            <Copy className="h-4 w-4" /> Copy for Claude
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -383,7 +369,7 @@ export function CoachPage() {
                     <CalendarCheck className="h-4 w-4" /> Move {movable.length === 1 ? 'it' : `these ${movable.length}`} to today
                   </Button>
                 )}
-                <Link to={`/planner?date=${today}`} className="text-sm font-medium text-accent hover:underline">
+                <Link to={linkTo.planner(today)} className="text-sm font-medium text-accent hover:underline">
                   Open planner
                 </Link>
               </div>
@@ -403,25 +389,6 @@ export function CoachPage() {
                 </details>
               )}
             </>
-          )}
-          {habitsLeft.length > 0 && (
-            <div className="mt-4 border-t border-line pt-3">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-subtle">Habits left today</p>
-              <ul className="flex flex-wrap gap-2">
-                {habitsLeft.map((h) => (
-                  <li key={h.id}>
-                    <button
-                      type="button"
-                      onClick={() => void habitActions.toggle(h, today, undefined)}
-                      className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-sm hover:bg-surface-2"
-                      title="Mark done for today"
-                    >
-                      <Check className="h-3.5 w-3.5 text-subtle" aria-hidden /> {h.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
           )}
         </Panel>
 
@@ -480,7 +447,7 @@ export function CoachPage() {
         </Panel>
       </div>
       <TaskEditor open={!!openTask} task={openTask?.task} onClose={() => setOpenTask(null)} />
-      <p className="mt-4 text-xs text-subtle">
+      <p className="text-xs text-subtle">
         The plan and warnings are worked out in the app. "Ask the coach" sends a summary of your data to a free AI model (Groq) for a written plan; "Copy for Claude" lets you paste it into a chat yourself.
       </p>
     </div>

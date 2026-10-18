@@ -11,6 +11,7 @@ import { browserTimeZone, formatInstant, isValidTimeZone, WEEKDAY_LONG } from '@
 import { cn, COLOR_SWATCHES, errorMessage, plural } from '@/lib/utils'
 import { env } from '@/lib/env'
 import { ACCENTS, accentColors, DEFAULT_ACCENT } from '@/lib/accents'
+import { NAV } from '@/components/layout/nav'
 import { useScrollIntoView } from '@/lib/useScrollIntoView'
 import { Button } from '@/components/ui/Button'
 import { confirm } from '@/components/ui/Dialog'
@@ -128,6 +129,27 @@ export function SettingsPage() {
         <p className="mt-2 text-xs text-muted">
           {ACCENTS.find((a) => a.id === (settings.accent ?? DEFAULT_ACCENT))?.name ?? 'Teal'}. Used for buttons, links and highlights, and in light mode to tint the background. Buttons and links are deepened a little in light mode so text stays readable.
         </p>
+      </Panel>
+
+      <Panel title="Menu">
+        <p className="mb-3 text-sm text-muted">Hide trackers you don't use. Their data is kept, and they come back when you switch them on.</p>
+        <div className="flex flex-col gap-3">
+          {NAV.filter((n) => n.optional).map((n) => {
+            const hiddenNav = new Set(settings.dashboard.menu_hidden ?? [])
+            return (
+              <Switch
+                key={n.to}
+                checked={!hiddenNav.has(n.to)}
+                label={`Show ${n.label}`}
+                onChange={(v) => {
+                  if (v) hiddenNav.delete(n.to)
+                  else hiddenNav.add(n.to)
+                  set('dashboard', { ...settings.dashboard, menu_hidden: [...hiddenNav] })
+                }}
+              />
+            )
+          })}
+        </div>
       </Panel>
 
       <Panel title="Planner">

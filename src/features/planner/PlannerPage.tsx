@@ -1,11 +1,11 @@
 import { useMemo, useState, type DragEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, CalendarClock, Check, ChevronLeft, ChevronRight, Clock, Plus, Repeat, Wand2, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Clock, Plus, Repeat, Wand2, X } from 'lucide-react'
 import { useSettings, useMinuteTick } from '@/settings/SettingsProvider'
 import { useInvalidate, useList } from '@/lib/db/hooks'
 import { gte, isNull } from '@/lib/db/store'
 import { getStore } from '@/lib/db'
-import { addDays, dateKey, daysInRange, formatKey, formatTime, relativeDay, startOfWeek, timeOf, zonedToInstant } from '@/lib/dates'
+import { addDays, formatKey, formatTime, relativeDay, timeOf, zonedToInstant } from '@/lib/dates'
 import { cn, errorMessage, formatMinutes } from '@/lib/utils'
 import { linkTo } from '@/lib/links'
 import { Button } from '@/components/ui/Button'
@@ -22,6 +22,7 @@ import { checkinMap, habitScheduledOn, isComplete } from '@/features/habits/logi
 import { useHabitActions } from '@/features/habits/actions'
 import { dayWindow, dropMinute, hhmm, layoutLanes, parsePlanDrop, parsePlanMove, PLAN_DRAG_TYPE, PLAN_MOVE_TYPE, suggestSlot, type PlanDrop, type PlanMove } from './logic'
 import { BlockEditor, type BlockTarget } from './BlockEditor'
+import { CAL_VIEWS, type CalView } from '@/features/calendar/views'
 
 const HOUR_PX = 56
 
@@ -56,18 +57,11 @@ export function PlannerPage() {
   useMinuteTick()
   const [params, setParams] = useSearchParams()
   const date: DateKey = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '') ? params.get('date')! : today
-  const mode = params.get('mode') === 'week' ? 'week' : 'day'
   const setDate = (d: DateKey) => {
     params.set('date', d)
     setParams(params)
   }
-  const setMode = (m: 'day' | 'week') => {
-    params.set('mode', m)
-    setParams(params)
-  }
-
-  const weekStart = startOfWeek(date, settings.week_start)
-  const days = mode === 'week' ? daysInRange(weekStart, addDays(weekStart, 6)) : [date]
+  const days = [date]
   const rangeStart = zonedToInstant(days[0], '00:00', tz)
   const rangeEnd = zonedToInstant(addDays(days[days.length - 1], 1), '00:00', tz)
 
@@ -99,50 +93,28 @@ export function PlannerPage() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <div className="mr-auto">
-          <h1 className="text-2xl font-semibold tracking-tight">{mode === 'day' ? relativeDay(date, today) : 'Week plan'}</h1>
-          <p className="text-sm text-muted">{mode === 'day' ? formatKey(date, 'EEEE, d MMMM yyyy') : `${formatKey(days[0], 'd MMM')} – ${formatKey(days[6], 'd MMM yyyy')}`}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{relativeDay(date, today)}</h1>
+          <p className="text-sm text-muted">{formatKey(date, 'EEEE, d MMMM yyyy')}</p>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" aria-label="Previous" onClick={() => setDate(addDays(date, mode === 'week' ? -7 : -1))}>
+          <Button variant="outline" size="icon" aria-label="Previous" onClick={() => setDate(addDays(date, -1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setDate(today)}>
             Today
           </Button>
-          <Button variant="outline" size="icon" aria-label="Next" onClick={() => setDate(addDays(date, mode === 'week' ? 7 : 1))}>
+          <Button variant="outline" size="icon" aria-label="Next" onClick={() => setDate(addDays(date, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <Segmented
-          label="Planner view"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: 'day', label: 'Day' },
-            { value: 'week', label: 'Week' },
-          ]}
-        />
+        {/* Same switch as the calendar's; Day is this page. */}
+        <Segmented label="Calendar view" value={'day' as CalView} onChange={(v) => v !== 'day' && setParams({ view: v, date })} options={CAL_VIEWS} />
         <Button onClick={() => setBlockTarget({ date })}>
           <Plus className="h-4 w-4" aria-hidden /> Time block
         </Button>
       </div>
 
-      {mode === 'day' ? (
-        <DayPlan date={date} items={items} instances={instances} allTasks={tasks} onBlock={setBlockTarget} onTask={setOpenTask} />
-      ) : (
-        <WeekPlan
-          days={days}
-          items={items}
-          instances={instances}
-          onBlock={setBlockTarget}
-          onTask={setOpenTask}
-          onDay={(d) => {
-            params.set('date', d)
-            params.set('mode', 'day')
-            setParams(params)
-          }}
-        />
-      )}
+      <DayPlan date={date} items={items} instances={instances} allTasks={tasks} onBlock={setBlockTarget} onTask={setOpenTask} />
 
       <BlockEditor target={blockTarget} onClose={() => setBlockTarget(null)} />
       <TaskEditor open={!!openTask} task={openTask?.task} onClose={() => setOpenTask(null)} />
@@ -611,58 +583,6 @@ function DayPlan({
           </Panel>
         )}
       </aside>
-    </div>
-  )
-}
-
-function WeekPlan({ days, items, instances, onDay, onBlock, onTask }: { days: DateKey[]; items: Item[]; instances: TaskInstance[]; onDay: (d: DateKey) => void; onBlock: (t: BlockTarget) => void; onTask: (i: TaskInstance) => void }) {
-  const { tz, today, settings } = useSettings()
-  const navigate = useNavigate()
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
-      {days.map((d) => {
-        const ds = zonedToInstant(d, '00:00', tz)
-        const de = zonedToInstant(addDays(d, 1), '00:00', tz)
-        const dayItems = items.filter((i) => (i.allDay ? i.start < de && i.end > ds : dateKey(i.start, tz) === d))
-        const dayTasks = instances.filter((i) => i.date === d && !i.scheduledAt)
-        const planned = dayItems.filter((i) => !i.allDay && i.kind !== 'event').reduce((s, i) => s + (i.end.getTime() - i.start.getTime()) / 60000, 0)
-        const taskMinutes = dayTasks.filter((i) => !i.done).reduce((s, i) => s + (i.task.estimated_minutes ?? 0), 0)
-        return (
-          <section key={d} className={cn('flex min-w-0 flex-col rounded-xl border bg-surface', d === today ? 'border-accent' : 'border-line')}>
-            <button type="button" onClick={() => onDay(d)} className="border-b border-line px-3 py-2 text-left hover:bg-surface-2">
-              <p className={cn('text-xs font-semibold uppercase', d === today ? 'text-accent' : 'text-muted')}>{formatKey(d, 'EEE')}</p>
-              <p className="text-lg font-semibold">{formatKey(d, 'd MMM')}</p>
-              <p className="text-xs text-muted">
-                {formatMinutes(Math.round(planned)) || '0m'} blocked{taskMinutes ? ` · ${formatMinutes(taskMinutes)} tasks` : ''}
-              </p>
-            </button>
-            <ul className="flex flex-col gap-1 p-2 text-xs">
-              {dayItems.map((i) => (
-                <li key={i.key}>
-                  <button
-                    type="button"
-                    className={cn('w-full truncate rounded-md border-l-2 bg-surface-2 px-2 py-1 text-left', i.done && 'line-through opacity-60')}
-                    style={{ borderLeftColor: i.color ?? 'rgb(var(--accent))' }}
-                    onClick={() => (i.task ? onTask(i.task) : i.block ? onBlock({ block: i.block }) : i.eventId ? navigate(linkTo.event(i.eventId)) : onDay(d))}
-                  >
-                    {!i.allDay && <span className="tabular text-muted">{formatTime(i.start, tz, settings.time_format)} </span>}
-                    {i.title}
-                  </button>
-                </li>
-              ))}
-              {dayTasks.map((i) => (
-                <li key={i.key}>
-                  <button type="button" onClick={() => onTask(i)} className={cn('flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-surface-2', i.done && 'text-muted line-through')}>
-                    <CalendarClock className="h-3 w-3 shrink-0 text-subtle" aria-hidden />
-                    <span className="truncate">{i.task.title}</span>
-                  </button>
-                </li>
-              ))}
-              {dayItems.length + dayTasks.length === 0 && <li className="px-1 py-2 text-subtle">Nothing planned</li>}
-            </ul>
-          </section>
-        )
-      })}
     </div>
   )
 }

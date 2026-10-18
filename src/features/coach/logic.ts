@@ -437,7 +437,7 @@ export function buildInsights(x: InsightInput): Insight[] {
       tone: 'info',
       title: `You study best around ${hourLabel(focus.start)}–${hourLabel((focus.start + 2) % 24)}`,
       detail: `${Math.round(focus.share * 100)}% of your study time starts in that window. Put the hardest subject there.`,
-      to: '/planner',
+      to: '/calendar?view=day',
     })
   }
 

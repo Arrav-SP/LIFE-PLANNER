@@ -13,19 +13,20 @@ test('coach ranks today’s tasks and can pull an upcoming one into today', asyn
   await quickAdd(page, 'Revise DBMS today !high for 40 minutes')
   await quickAdd(page, 'Prepare OS slides tomorrow')
   await page.goto('/coach')
+  const coach = page.getByRole('main')
   await expect(page.getByRole('heading', { name: 'Coach', level: 1 })).toBeVisible()
   // Free time otherwise comes from the clock, so a late-evening run would fit fewer tasks.
   await page.getByLabel('Free time today').fill('5')
 
-  const list = page.getByRole('list').filter({ hasText: 'Revise DBMS' }).first()
+  const list = coach.getByRole('list').filter({ hasText: 'Revise DBMS' }).first()
   const items = list.getByRole('listitem')
   await expect(items.first()).toContainText('Revise DBMS')
   await expect(items.first()).toContainText('Due today')
   await expect(items.nth(1)).toContainText('Prepare OS slides')
   await expect(items.nth(1)).toContainText('Due in 1 day')
 
-  await page.getByRole('button', { name: 'Move it to today' }).click()
-  await expect(page.getByRole('button', { name: 'Move it to today' })).toBeHidden()
+  await coach.getByRole('button', { name: 'Move it to today' }).click()
+  await expect(coach.getByRole('button', { name: 'Move it to today' })).toBeHidden()
   await page.goto('/tasks?view=today')
   await expect(page.getByText('Prepare OS slides', { exact: true })).toBeVisible()
 })

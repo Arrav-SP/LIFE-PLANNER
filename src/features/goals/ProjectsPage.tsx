@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { HubTabs } from '@/components/ui/HubTabs'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Archive, ArchiveRestore, ArrowLeft, FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
@@ -54,6 +55,7 @@ export function ProjectsPage() {
           </Button>
         }
       />
+      <HubTabs hub="goals" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div className={cn(selected && 'hidden lg:block')}>
           <Segmented
