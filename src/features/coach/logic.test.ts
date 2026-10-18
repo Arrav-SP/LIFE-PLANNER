@@ -173,7 +173,7 @@ describe('coachSummary', () => {
     expect(text).toContain('today is Monday 12 Oct 2026')
     expect(text).toContain('- ML course (target 15 Dec 2026): 10%')
     expect(text).toContain('- ML: 9/10 topics left')
-    expect(text).toContain('- Week 2 quiz (30m; Due today)')
+    expect(text).toContain('- Week 2 quiz (no estimate, assumed 30m; Due today)')
   })
 })
 
@@ -215,5 +215,15 @@ describe('day plan', () => {
     const at = (h: string) => new Date(`2026-10-12T${h}:00+05:30`)
     const { minutes } = freeToday([{ key: 'class', start: at('10:00'), end: at('11:00') }], at('07:00'), at('22:00'), at('09:00'))
     expect(minutes).toBe(60 + 11 * 60)
+  })
+})
+
+describe('estimates', () => {
+  it('says when a task time is only the default', () => {
+    const { picks } = suggestToday(expand([task({ title: 'Midterm', due_date: TODAY }), task({ title: 'Quiz', due_date: TODAY, estimated_minutes: 90 })]), [], { ...opts, budgetMinutes: 600 })
+    expect(picks.map((p) => [suggestionTitle(p), p.minutes, p.kind === 'task' && p.estimated])).toEqual([
+      ['Midterm', 30, false],
+      ['Quiz', 90, true],
+    ])
   })
 })

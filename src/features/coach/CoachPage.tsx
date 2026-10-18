@@ -37,6 +37,7 @@ import {
   type Insight,
   type PlanStatus,
   type Suggestion,
+  type TaskSuggestion,
 } from './logic'
 
 /** A manual "free time today" override, kept for that day only. */
@@ -112,7 +113,7 @@ export function CoachPage() {
   const events = useList('events', { filters: [isNull('archived_at')] })
   const exceptions = useList('event_exceptions')
   const blocks = useList('time_blocks')
-  const { bulk } = useTaskActions()
+  const { bulk, update } = useTaskActions()
   const habitActions = useHabitActions()
 
   // Free time: the gaps left today between events and planner blocks, within the day hours in Settings.
@@ -362,7 +363,11 @@ export function CoachPage() {
                         <button type="button" onClick={() => openPick(s)} className="truncate text-left text-sm font-medium hover:underline">
                           {suggestionTitle(s)}
                         </button>
-                        <span className="shrink-0 text-xs text-muted tabular">{formatMinutes(s.minutes)}</span>
+                        {s.kind === 'task' ? (
+                          <EstimatePicker suggestion={s} onPick={(m) => void update(s.instance.task, { estimated_minutes: m }, 'Time saved')} />
+                        ) : (
+                          <span className="shrink-0 text-xs text-muted tabular">{formatMinutes(s.minutes)}</span>
+                        )}
                       </div>
                       {s.reasons.length > 0 && <p className="text-xs text-muted">{s.reasons.join(' · ')}</p>}
                     </div>
@@ -479,6 +484,30 @@ export function CoachPage() {
         The plan and warnings are worked out in the app. "Ask the coach" sends a summary of your data to a free AI model (Groq) for a written plan; "Copy for Claude" lets you paste it into a chat yourself.
       </p>
     </div>
+  )
+}
+
+const ESTIMATES = [15, 30, 45, 60, 90, 120, 180, 240, 300]
+
+/** The task's time, changeable in place. Without an estimate it shows the assumed default and asks for one. */
+function EstimatePicker({ suggestion: s, onPick }: { suggestion: TaskSuggestion; onPick: (minutes: number) => void }) {
+  const est = s.instance.task.estimated_minutes
+  const options = est && !ESTIMATES.includes(est) ? [...ESTIMATES, est].sort((a, b) => a - b) : ESTIMATES
+  return (
+    <select
+      aria-label={`Time needed for ${s.instance.task.title}`}
+      title={s.estimated ? 'Change the time this needs' : 'No time estimate yet: the default task length from Settings is assumed'}
+      value={est ?? ''}
+      onChange={(e) => e.target.value && onPick(Number(e.target.value))}
+      className={cn('h-7 shrink-0 rounded-md border bg-surface px-1.5 text-xs tabular', s.estimated ? 'border-line text-muted' : 'border-dashed border-accent text-accent')}
+    >
+      {!s.estimated && <option value="">Set time (~{formatMinutes(s.minutes)})</option>}
+      {options.map((m) => (
+        <option key={m} value={m}>
+          {formatMinutes(m)}
+        </option>
+      ))}
+    </select>
   )
 }
 
