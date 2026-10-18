@@ -140,7 +140,6 @@ export function HabitsPage() {
 function HabitCard({ habit: h, checkins, focused, goal, onLog, menu }: { habit: Habit; checkins: HabitCheckin[]; focused: boolean; goal?: Goal; onLog: (d: DateKey) => void; menu: React.ReactNode }) {
   const { today, settings } = useSettings()
   const actions = useHabitActions()
-  const [showHistory, setShowHistory] = useState(false)
   const stats = useMemo(() => habitStats(h, checkins, today, settings.week_start), [h, checkins, today, settings.week_start])
   const map = useMemo(() => checkinMap(checkins, h.id), [checkins, h.id])
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6))
@@ -200,22 +199,18 @@ function HabitCard({ habit: h, checkins, focused, goal, onLog, menu }: { habit: 
               aria-label={`${h.name} on ${formatKey(d, 'EEEE d MMM')}: ${done ? 'done' : partial ? `${c!.value} of ${h.target_value}` : 'not done'}`}
               className={cn(
                 'flex h-12 w-11 shrink-0 flex-col items-center justify-center rounded-lg border text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-                done ? 'border-transparent text-white' : 'border-line hover:bg-surface-2',
+                done ? 'border-transparent bg-accent text-accent-fg' : partial ? 'border-transparent bg-accent/25' : 'border-line hover:bg-surface-2',
                 !scheduled && !done && 'border-dashed opacity-60',
                 d === today && !done && 'border-accent',
               )}
-              style={done ? { background: h.color } : partial ? { background: `${h.color}33` } : undefined}
             >
               <span className={cn(!done && 'text-muted')}>{WEEKDAY_SHORT[weekdayOf(d)].slice(0, 2)}</span>
               <span className="font-semibold tabular">{h.kind === 'numeric' && c ? c.value : formatKey(d, 'd')}</span>
             </button>
           )
         })}
-        <button type="button" onClick={() => setShowHistory((v) => !v)} className="ml-auto shrink-0 px-2 text-xs font-medium text-accent hover:underline">
-          {showHistory ? 'Hide history' : 'History'}
-        </button>
       </div>
-      {showHistory && <Heatmap habit={h} map={map} />}
+      <Heatmap habit={h} map={map} />
     </li>
   )
 }
