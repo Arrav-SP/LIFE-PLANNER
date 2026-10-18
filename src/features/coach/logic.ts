@@ -27,6 +27,8 @@ export type TaskSuggestion = SuggestionBase & {
   instance: TaskInstance
   /** Undated, unlinked and low-stakes: only offered when nothing else is pressing. */
   backlog?: boolean
+  /** False when `minutes` is only the default task length from Settings. */
+  estimated: boolean
 }
 export type StudySuggestion = SuggestionBase & { kind: 'study'; subject: Subject }
 export type Suggestion = TaskSuggestion | StudySuggestion
@@ -93,12 +95,13 @@ export function scoreInstance(i: TaskInstance, goals: Map<string, Goal>, today: 
     }
   }
   const minutes = t.estimated_minutes ?? defaultMinutes
+  const estimated = t.estimated_minutes != null
   // Undated, unlinked, low-stakes tasks: kept as backlog, offered only on a quiet day.
   if (!i.date && !goal && score < 20) {
-    return { kind: 'task', instance: i, score, minutes, reasons: [`In your backlog since ${formatKey(dateKey(t.created_at, tz), 'd MMM')}`], mustDo: false, backlog: true }
+    return { kind: 'task', instance: i, score, minutes, estimated, reasons: [`In your backlog since ${formatKey(dateKey(t.created_at, tz), 'd MMM')}`], mustDo: false, backlog: true }
   }
 
-  return { kind: 'task', instance: i, score, minutes, reasons, mustDo }
+  return { kind: 'task', instance: i, score, minutes, estimated, reasons, mustDo }
 }
 
 export function suggestToday(
@@ -495,7 +498,10 @@ export function coachSummary(x: {
   if (!x.plan.length) lines.push('- none')
   lines.push(`- Total study this week: ${h(x.studyThisWeek)}`)
   lines.push('', "## Today's candidate tasks (highest priority first)")
-  for (const s of [...x.suggestions.picks, ...x.suggestions.extra]) lines.push(`- ${suggestionTitle(s)} (${h(s.minutes)}; ${s.reasons.join(', ') || 'no date'})`)
+  for (const s of [...x.suggestions.picks, ...x.suggestions.extra]) {
+    const time = s.kind === 'task' && !s.estimated ? `no estimate, assumed ${h(s.minutes)}` : h(s.minutes)
+    lines.push(`- ${suggestionTitle(s)} (${time}; ${s.reasons.join(', ') || 'no date'})`)
+  }
   if (!x.suggestions.picks.length) lines.push('- none')
   lines.push('', '## Habits (last 7 days)')
   for (const r of x.habits) lines.push(`- ${r.name}: ${Math.round(r.rate * 100)}%`)
