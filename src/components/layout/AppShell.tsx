@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { CalendarCheck2, Moon, MoreHorizontal, Plus, Search, Sun, X } from 'lucide-react'
+import { CalendarCheck2, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Search, Sun, X } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { NAV, MOBILE_TABS } from './nav'
 import { cn } from '@/lib/utils'
@@ -24,30 +24,35 @@ function ThemeToggle() {
   )
 }
 
-function SideNav({ onNavigate }: { onNavigate?: () => void }) {
+/** Remembered per device: the desktop sidebar shrunk to an icon rail. */
+const SIDEBAR_KEY = 'lp-sidebar-collapsed'
+
+function SideNav({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
   const groups = ['main', 'track', 'review', 'system'] as const
   return (
     <nav aria-label="Main" className="flex flex-col gap-4">
       {groups.map((g) => (
         <div key={g} className="flex flex-col gap-0.5">
-          {GROUP_LABEL[g] && <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">{GROUP_LABEL[g]}</p>}
+          {GROUP_LABEL[g] && !collapsed && <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">{GROUP_LABEL[g]}</p>}
           {NAV.filter((n) => n.group === g).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
               end={n.to === '/'}
               onClick={onNavigate}
+              title={collapsed ? n.label : undefined}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors',
+                  collapsed ? 'justify-center px-0' : 'px-3',
                   isActive ? 'bg-accent-soft text-fg' : 'text-muted hover:bg-surface-2 hover:text-fg',
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  <n.icon className={cn('h-[18px] w-[18px]', isActive && 'text-accent')} aria-hidden />
-                  {n.label}
+                  <n.icon className={cn('h-[18px] w-[18px] shrink-0', isActive && 'text-accent')} aria-hidden />
+                  <span className={cn(collapsed && 'sr-only')}>{n.label}</span>
                 </>
               )}
             </NavLink>
@@ -62,6 +67,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { mode, user } = useAuth()
   const [quickAdd, setQuickAdd] = useState(false)
   const [more, setMore] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleSidebar = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, c ? '0' : '1')
+      } catch {
+        /* preference only */
+      }
+      return !c
+    })
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -100,25 +121,48 @@ export function AppShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-surface px-3 py-4 md:flex">
-        <div className="mb-5 flex items-center gap-2 px-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg">
+      <aside className={cn('sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-surface py-4 transition-[width] duration-200 md:flex', collapsed ? 'w-16 px-2' : 'w-60 px-3')}>
+        <div className={cn('mb-5 flex items-center gap-2', collapsed ? 'flex-col' : 'px-2')}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg">
             <CalendarCheck2 className="h-4 w-4" aria-hidden />
           </span>
-          <span className="font-semibold">Life Planner</span>
+          {!collapsed && <span className="truncate font-semibold">Life Planner</span>}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg', !collapsed && 'ml-auto')}
+          >
+            {collapsed ? <PanelLeftOpen className="h-4 w-4" aria-hidden /> : <PanelLeftClose className="h-4 w-4" aria-hidden />}
+          </button>
         </div>
         <button
           onClick={() => setQuickAdd(true)}
-          className="mb-4 flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-fg shadow-sm hover:bg-accent/90"
+          aria-label={collapsed ? 'Quick add' : undefined}
+          title={collapsed ? 'Quick add (Q)' : undefined}
+          className={cn('mb-4 flex items-center gap-2 rounded-lg bg-accent py-2 text-sm font-medium text-accent-fg shadow-sm hover:bg-accent/90', collapsed ? 'justify-center' : 'px-3')}
         >
-          <Plus className="h-4 w-4" aria-hidden /> Quick add
-          <kbd className="ml-auto rounded bg-white/20 px-1.5 text-[11px]">Q</kbd>
+          <Plus className="h-4 w-4 shrink-0" aria-hidden />
+          {!collapsed && (
+            <>
+              Quick add
+              <kbd className="ml-auto rounded bg-white/20 px-1.5 text-[11px]">Q</kbd>
+            </>
+          )}
         </button>
-        <InstallButton variant="sidebar" />
+        {collapsed ? (
+          <div className="mb-2 flex justify-center">
+            <InstallButton variant="icon" />
+          </div>
+        ) : (
+          <InstallButton variant="sidebar" />
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <SideNav />
+          <SideNav collapsed={collapsed} />
         </div>
-        <p className="mt-3 truncate px-2 text-xs text-subtle">{mode === 'local' ? 'Local mode · this browser only' : user?.email}</p>
+        {!collapsed && <p className="mt-3 truncate px-2 text-xs text-subtle">{mode === 'local' ? 'Local mode · this browser only' : user?.email}</p>}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
