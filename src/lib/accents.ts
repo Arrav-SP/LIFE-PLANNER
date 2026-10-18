@@ -30,8 +30,7 @@ export const ACCENTS: Accent[] = [
   { id: 'butter', name: 'Butter', hue: 48, sat: 85 },
 ]
 
-/** The app's backgrounds text must read on (index.css --surface-2, the worst case in each theme). */
-export const LIGHT_BG: RGB = [240, 240, 236]
+/** Dark mode's darkest-for-text background (index.css --surface-2); light mode's comes from the accent. */
 export const DARK_BG: RGB = [32, 36, 41]
 
 function hsl(h: number, s: number, l: number): RGB {
@@ -63,19 +62,29 @@ function readable(a: Accent, l: number, step: number, bg: RGB): RGB {
 }
 
 export function accentColors(a: Accent) {
+  // Light mode tints the page, panels and borders with the hue; cards (--surface) stay white.
+  const surface2 = hsl(a.hue, Math.min(a.sat, 50), 92)
   return {
     swatch: hsl(a.hue, a.sat, 80),
-    light: { accent: readable(a, 50, -1, LIGHT_BG), fg: [255, 255, 255] as RGB, soft: hsl(a.hue, a.sat, 90) },
+    light: {
+      accent: readable(a, 50, -1, surface2),
+      fg: [255, 255, 255] as RGB,
+      soft: hsl(a.hue, a.sat, 88),
+      bg: hsl(a.hue, Math.min(a.sat, 70), 96),
+      surface2,
+      line: hsl(a.hue, Math.min(a.sat, 30), 86),
+    },
     dark: { accent: readable(a, 80, 1, DARK_BG), fg: hsl(a.hue, 40, 12), soft: hsl(a.hue, Math.min(a.sat, 35), 20) },
   }
 }
 
-/** CSS that overrides the default (teal) accent from index.css; empty for the default. */
+/** CSS that overrides the colours in index.css; empty (index.css as is) for no or an unknown accent. */
 export function accentCss(id: string | null | undefined): string {
   const a = ACCENTS.find((x) => x.id === id)
-  if (!a || a.id === DEFAULT_ACCENT) return ''
+  if (!a) return ''
   const { light, dark } = accentColors(a)
-  const vars = (c: { accent: RGB; fg: RGB; soft: RGB }) => `--accent:${c.accent.join(' ')};--accent-fg:${c.fg.join(' ')};--accent-soft:${c.soft.join(' ')}`
+  const v = (c: RGB) => c.join(' ')
+  const accent = (c: { accent: RGB; fg: RGB; soft: RGB }) => `--accent:${v(c.accent)};--accent-fg:${v(c.fg)};--accent-soft:${v(c.soft)}`
   // `html:root` outranks index.css's `:root` wherever this <style> lands in <head>.
-  return `html:root{${vars(light)}}html:root.dark{${vars(dark)}}`
+  return `html:root{${accent(light)};--bg:${v(light.bg)};--surface-2:${v(light.surface2)};--line:${v(light.line)}}html:root.dark{${accent(dark)}}`
 }
