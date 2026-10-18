@@ -3,6 +3,7 @@ import { addDays, dateKey, diffDays, formatKey, weekdayOf } from '@/lib/dates'
 import { formatMinutes } from '@/lib/utils'
 import type { TaskInstance } from '@/features/tasks/logic'
 import { habitRates } from '@/features/analytics/logic'
+import { freeSlots } from '@/features/calendar/logic'
 
 /**
  * The coach is plain arithmetic over the user's own data: no network calls, no AI service.
@@ -13,8 +14,7 @@ import { habitRates } from '@/features/analytics/logic'
 // Ideal tasks for today
 // ---------------------------------------------------------------------------
 
-export interface Suggestion {
-  instance: TaskInstance
+interface SuggestionBase {
   score: number
   minutes: number
   reasons: string[]
@@ -22,9 +22,21 @@ export interface Suggestion {
   mustDo: boolean
 }
 
+export type TaskSuggestion = SuggestionBase & {
+  kind: 'task'
+  instance: TaskInstance
+  /** Undated, unlinked and low-stakes: only offered when nothing else is pressing. */
+  backlog?: boolean
+}
+export type StudySuggestion = SuggestionBase & { kind: 'study'; subject: Subject }
+export type Suggestion = TaskSuggestion | StudySuggestion
+
+export const suggestionKey = (s: Suggestion) => (s.kind === 'task' ? s.instance.key : `study-${s.subject.id}`)
+export const suggestionTitle = (s: Suggestion) => (s.kind === 'task' ? s.instance.task.title : `Study: ${s.subject.name}`)
+
 const PRIORITY_POINTS: Record<Priority, number> = { urgent: 30, high: 20, normal: 8, low: 0 }
 
-export function scoreInstance(i: TaskInstance, goals: Map<string, Goal>, today: DateKey, tz: string, defaultMinutes: number): Suggestion | null {
+export function scoreInstance(i: TaskInstance, goals: Map<string, Goal>, today: DateKey, tz: string, defaultMinutes: number): TaskSuggestion | null {
   const t = i.task
   if (i.done || i.skipped || t.parent_id || t.archived_at) return null
   if (t.status === 'done' || t.status === 'cancelled') return null
@@ -80,40 +92,91 @@ export function scoreInstance(i: TaskInstance, goals: Map<string, Goal>, today: 
       reasons.push(`Moves “${goal.title}”`)
     }
   }
-  // Undated, unlinked, low-stakes tasks are not worth suggesting.
-  if (!i.date && !goal && score < 20) return null
+  const minutes = t.estimated_minutes ?? defaultMinutes
+  // Undated, unlinked, low-stakes tasks: kept as backlog, offered only on a quiet day.
+  if (!i.date && !goal && score < 20) {
+    return { kind: 'task', instance: i, score, minutes, reasons: [`In your backlog since ${formatKey(dateKey(t.created_at, tz), 'd MMM')}`], mustDo: false, backlog: true }
+  }
 
-  return { instance: i, score, minutes: t.estimated_minutes ?? defaultMinutes, reasons, mustDo }
+  return { kind: 'task', instance: i, score, minutes, reasons, mustDo }
 }
 
 export function suggestToday(
   instances: TaskInstance[],
   goals: Goal[],
-  opts: { today: DateKey; tz: string; budgetMinutes: number; defaultMinutes: number; max?: number },
+  opts: {
+    today: DateKey
+    tz: string
+    budgetMinutes: number
+    defaultMinutes: number
+    max?: number
+    /** Study sessions to rank alongside tasks (see studyPicks). */
+    study?: StudySuggestion[]
+    /** From estimateBias: tasks usually take this many times their estimate. */
+    minutesFactor?: number
+  },
 ): { picks: Suggestion[]; extra: Suggestion[]; mustDoMinutes: number } {
   const byId = new Map(goals.map((g) => [g.id, g]))
   const seen = new Set<string>()
-  const scored: Suggestion[] = []
+  const scored: Suggestion[] = [...(opts.study ?? [])]
+  const backlog: TaskSuggestion[] = []
+  const factor = opts.minutesFactor && opts.minutesFactor >= 1.15 ? opts.minutesFactor : 1
   for (const i of instances) {
     if (seen.has(i.key)) continue
     seen.add(i.key)
     const s = scoreInstance(i, byId, opts.today, opts.tz, opts.defaultMinutes)
-    if (s) scored.push(s)
+    if (!s) continue
+    if (factor > 1) {
+      s.minutes = Math.round((s.minutes * factor) / 5) * 5
+      s.reasons.push(`Padded: you usually run ~${Math.round((factor - 1) * 100)}% over`)
+    }
+    if (s.backlog) backlog.push(s)
+    else scored.push(s)
   }
-  scored.sort((a, b) => b.score - a.score || a.minutes - b.minutes || a.instance.task.title.localeCompare(b.instance.task.title))
+  scored.sort((a, b) => b.score - a.score || a.minutes - b.minutes || suggestionTitle(a).localeCompare(suggestionTitle(b)))
+  backlog.sort((a, b) => a.instance.task.created_at.localeCompare(b.instance.task.created_at))
   const max = opts.max ?? 8
   const picks: Suggestion[] = []
   const rest: Suggestion[] = []
   let used = 0
-  for (const s of scored) {
+  // Backlog only fills the list when nothing ranked does.
+  for (const s of scored.length ? scored : backlog) {
     const fits = used + s.minutes <= opts.budgetMinutes
     if (picks.length < max && (fits || picks.length === 0)) {
       picks.push(s)
       used += s.minutes
     } else rest.push(s)
   }
+  if (scored.length) rest.push(...backlog)
   const mustDoMinutes = scored.filter((s) => s.mustDo).reduce((t, s) => t + s.minutes, 0)
   return { picks, extra: rest.slice(0, 5), mustDoMinutes }
+}
+
+/** A study session for each subject that still needs time today, from its pace (or weekly target). */
+export function studyPicks(plan: StudyPlanRow[], studiedToday: Map<string, number>): StudySuggestion[] {
+  const out: StudySuggestion[] = []
+  for (const p of plan) {
+    if (p.status === 'done' || p.status === 'overdue' || !p.neededPerDay) continue
+    const left = p.neededPerDay - (studiedToday.get(p.subject.id) ?? 0)
+    if (left < 10) continue
+    const behind = p.status === 'behind'
+    out.push({
+      kind: 'study',
+      subject: p.subject,
+      score: behind ? 35 : p.deadline ? 20 : 12,
+      minutes: Math.min(120, Math.max(25, roundTo5(left))),
+      reasons: [behind ? 'Behind pace' : p.deadline ? `On pace for ${formatKey(p.deadline, 'd MMM')}` : 'Weekly target'],
+      mustDo: false,
+    })
+  }
+  return out
+}
+
+/** Free gaps left today between busy items, from now (or the day start) to the day end. */
+export function freeToday(busy: { key: string; start: Date; end: Date; allDay?: boolean }[], dayStart: Date, dayEnd: Date, now: Date) {
+  const from = now > dayStart ? new Date(Math.min(now.getTime(), dayEnd.getTime())) : dayStart
+  const slots = freeSlots(busy, from, dayEnd, 15)
+  return { slots, minutes: Math.round(slots.reduce((t, s) => t + (s.end.getTime() - s.start.getTime()) / 60000, 0)) }
 }
 
 // ---------------------------------------------------------------------------
@@ -160,9 +223,11 @@ export function studyPlan(
       const recentMinutes = mine.filter((x) => dateKey(x.started_at, tz) >= from).reduce((t, x) => t + (x.actual_minutes ?? 0), 0)
       const recentPerDay = recentMinutes / windowDays
       const goal = subject.goal_id ? goalById.get(subject.goal_id) : undefined
-      const deadline = goal?.target_date ?? null
+      // The subject's own exam date wins over its goal's target date.
+      const deadline = subject.target_date ?? goal?.target_date ?? null
+      const goalTitle = subject.target_date ? 'Exam' : goal?.title ?? null
       const daysLeft = deadline ? diffDays(deadline, today) + 1 : null // the deadline day itself counts
-      const base = { subject, deadline, goalTitle: goal?.title ?? null, daysLeft, topicsTotal: own.length, topicsLeft, recentPerDay }
+      const base = { subject, deadline, goalTitle, daysLeft, topicsTotal: own.length, topicsLeft, recentPerDay }
 
       if (own.length > 0 && topicsLeft === 0) return { ...base, neededPerDay: 0, topicsPerDay: 0, status: 'done' as const, note: 'All topics done. Switch to revision.' }
       if (!deadline || daysLeft === null) {
@@ -172,7 +237,7 @@ export function studyPlan(
           neededPerDay: target ? target / 7 : null,
           topicsPerDay: null,
           status: 'no_deadline' as const,
-          note: 'Link this subject to a goal with a target date to get a pace.',
+          note: target ? 'Add an exam date to the subject for a pace to its deadline.' : 'Add an exam date or a weekly target to the subject to get a pace.',
         }
       }
       if (daysLeft <= 0) return { ...base, neededPerDay: null, topicsPerDay: null, status: 'overdue' as const, note: `The deadline (${formatKey(deadline, 'd MMM')}) has passed with ${topicsLeft} topics left.` }
@@ -430,7 +495,7 @@ export function coachSummary(x: {
   if (!x.plan.length) lines.push('- none')
   lines.push(`- Total study this week: ${h(x.studyThisWeek)}`)
   lines.push('', "## Today's candidate tasks (highest priority first)")
-  for (const s of [...x.suggestions.picks, ...x.suggestions.extra]) lines.push(`- ${s.instance.task.title} (${h(s.minutes)}; ${s.reasons.join(', ') || 'no date'})`)
+  for (const s of [...x.suggestions.picks, ...x.suggestions.extra]) lines.push(`- ${suggestionTitle(s)} (${h(s.minutes)}; ${s.reasons.join(', ') || 'no date'})`)
   if (!x.suggestions.picks.length) lines.push('- none')
   lines.push('', '## Habits (last 7 days)')
   for (const r of x.habits) lines.push(`- ${r.name}: ${Math.round(r.rate * 100)}%`)

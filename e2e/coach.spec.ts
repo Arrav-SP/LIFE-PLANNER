@@ -14,6 +14,8 @@ test('coach ranks today’s tasks and can pull an upcoming one into today', asyn
   await quickAdd(page, 'Prepare OS slides tomorrow')
   await page.goto('/coach')
   await expect(page.getByRole('heading', { name: 'Coach', level: 1 })).toBeVisible()
+  // Free time otherwise comes from the clock, so a late-evening run would fit fewer tasks.
+  await page.getByLabel('Free time today').fill('5')
 
   const list = page.getByRole('list').filter({ hasText: 'Revise DBMS' }).first()
   const items = list.getByRole('listitem')
