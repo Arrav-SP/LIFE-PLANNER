@@ -18,8 +18,15 @@ async function log(task_id: string, action: TaskHistoryAction, changes: Record<s
   }
 }
 
+function removeTaskReminders(taskId: string) {
+  return getStore().removeWhere('reminders', [
+    { field: 'source_type', op: 'eq', value: 'task' },
+    { field: 'source_id', op: 'eq', value: taskId },
+  ])
+}
+
 /** Mark one instance done or not done. Recurring tasks only touch that occurrence. */
-export async function applyDone(i: TaskInstance, done: boolean) {
+export async function applyDone(i: TaskInstance, done: boolean, tz: string) {
   const store = getStore()
   const now = new Date().toISOString()
   if (i.occurrenceDate && i.task.recurrence) {
@@ -50,8 +57,10 @@ export async function applyDone(i: TaskInstance, done: boolean) {
       await log(i.task.id, 'occurrence_reopened', { date: i.occurrenceDate })
     }
   } else {
-    await store.update('tasks', i.task.id, { status: done ? 'done' : 'todo', completed_at: done ? now : null })
+    const t = await store.update('tasks', i.task.id, { status: done ? 'done' : 'todo', completed_at: done ? now : null })
     await log(i.task.id, done ? 'completed' : 'reopened')
+    // Done drops the task's pending reminders; reopening plans them again.
+    await syncTaskReminders(t, tz)
   }
 }
 
@@ -112,15 +121,15 @@ export function useTaskActions() {
   const setDone = useCallback(
     (i: TaskInstance, done: boolean) =>
       run(async () => {
-        await applyDone(i, done)
+        await applyDone(i, done, tz)
         if (done) {
           toast.success(`Completed “${i.task.title}”`, {
             label: 'Undo',
-            onClick: () => void applyDone(i, false).then(refresh),
+            onClick: () => void applyDone(i, false, tz).then(refresh),
           })
         }
       }),
-    [run, refresh],
+    [run, refresh, tz],
   )
 
   const skip = useCallback(
@@ -195,10 +204,7 @@ export function useTaskActions() {
       const ok = await confirm({ title: 'Delete this task?', message: `“${t.title}”, its subtasks and history will be permanently deleted. Archive it instead if you might need it later.`, confirmLabel: 'Delete', danger: true })
       if (!ok) return false
       await run(async () => {
-        await getStore().removeWhere('reminders', [
-          { field: 'source_type', op: 'eq', value: 'task' },
-          { field: 'source_id', op: 'eq', value: t.id },
-        ])
+        await removeTaskReminders(t.id)
         await getStore().remove('tasks', t.id)
       }, 'Task deleted')
       return true
@@ -215,22 +221,26 @@ export function useTaskActions() {
       await run(async () => {
         const store = getStore()
         for (const i of items) {
+          let changed: Task | null = null
           if (action === 'done') {
             if (i.occurrenceDate && i.task.recurrence)
               await store.upsert('task_occurrences', { task_id: i.task.id, occurrence_date: i.occurrenceDate, status: 'done', completed_at: new Date().toISOString() }, ['task_id', 'occurrence_date'])
-            else await store.update('tasks', i.task.id, { status: 'done', completed_at: new Date().toISOString() })
-          } else if (action === 'archive') await store.update('tasks', i.task.id, { archived_at: new Date().toISOString() })
-          else if (action === 'delete') await store.remove('tasks', i.task.id)
-          else {
+            else changed = await store.update('tasks', i.task.id, { status: 'done', completed_at: new Date().toISOString() })
+          } else if (action === 'archive') changed = await store.update('tasks', i.task.id, { archived_at: new Date().toISOString() })
+          else if (action === 'delete') {
+            await removeTaskReminders(i.task.id)
+            await store.remove('tasks', i.task.id)
+          } else {
             const date = action === 'today' ? today : addDays(today, 1)
             if (i.occurrenceDate && i.task.recurrence)
               await store.upsert('task_occurrences', { task_id: i.task.id, occurrence_date: i.occurrenceDate, status: 'rescheduled', rescheduled_to: date }, ['task_id', 'occurrence_date'])
-            else await store.update('tasks', i.task.id, { due_date: date })
+            else changed = await store.update('tasks', i.task.id, { due_date: date })
           }
+          if (changed) await syncTaskReminders(changed, tz)
         }
       }, `Updated ${items.length} tasks`)
     },
-    [run],
+    [run, tz],
   )
 
   return { create, update, setDone, skip, reschedule, postpone, duplicate, archive, remove, bulk, refresh }
