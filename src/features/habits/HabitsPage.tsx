@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Archive, ArchiveRestore, Flame, Pencil, Plus, Repeat, Target, Trash2, Trophy } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useList, useInvalidate } from '@/lib/db/hooks'
 import { gte } from '@/lib/db/store'
 import { getStore } from '@/lib/db'
-import { addDays, formatKey, startOfWeek, WEEKDAY_SHORT, weekdayOf } from '@/lib/dates'
+import { addDays, formatKey, WEEKDAY_SHORT, weekdayOf } from '@/lib/dates'
 import { cn, errorMessage } from '@/lib/utils'
 import { linkTo } from '@/lib/links'
 import { useScrollIntoView } from '@/lib/useScrollIntoView'
@@ -17,7 +17,7 @@ import { EmptyState, ListSkeleton, PageHeader, Segmented } from '@/components/ui
 import { toast } from '@/components/ui/toast'
 import { syncHabitReminders } from '@/features/reminders/sync'
 import type { DateKey, Goal, Habit, HabitCheckin } from '@/lib/db/types'
-import { checkinMap, describeSchedule, habitScheduledOn, habitStats, isComplete } from './logic'
+import { checkinMap, describeSchedule, habitScheduledOn, habitStats, heatLevel, heatmapWeeks, isComplete } from './logic'
 import { useHabitActions } from './actions'
 import { HabitEditor } from './HabitEditor'
 
@@ -221,20 +221,60 @@ function HabitCard({ habit: h, checkins, focused, goal, onLog, menu }: { habit: 
 }
 
 /** The last 20 weeks as a GitHub-style grid. */
+/** Accent shades for the history grid, from nothing logged to target met. */
+const HEAT = ['bg-surface-2', 'bg-accent/25', 'bg-accent/50', 'bg-accent/75', 'bg-accent']
+
 function Heatmap({ habit: h, map }: { habit: Habit; map: Map<DateKey, HabitCheckin> }) {
   const { today, settings } = useSettings()
-  const weeks = 20
-  const first = addDays(startOfWeek(today, settings.week_start), -(weeks - 1) * 7)
+  const cols = heatmapWeeks(today, settings.week_start, 53)
+  const scroller = useRef<HTMLDivElement>(null)
+  // Start scrolled to today, like GitHub, when the year doesn't fit (phones).
+  useEffect(() => {
+    if (scroller.current) scroller.current.scrollLeft = scroller.current.scrollWidth
+  }, [])
+  const logged = cols.flatMap((c) => c.days).filter((d) => d && heatLevel(h, map.get(d)) > 0).length
+  const rows = Array.from({ length: 7 }, (_, i) => (settings.week_start + i) % 7)
+
   return (
-    <div className="mt-3 overflow-x-auto">
-      <div className="inline-grid grid-flow-col gap-1" style={{ gridTemplateRows: 'repeat(7, 0.8rem)' }}>
-        {Array.from({ length: weeks * 7 }, (_, i) => {
-          const d = addDays(first, i)
-          if (d > today) return <span key={d} className="h-[0.8rem] w-[0.8rem]" />
-          const c = map.get(d)
-          const done = isComplete(h, c)
-          return <span key={d} title={`${formatKey(d, 'd MMM')}${c ? `: ${c.value}` : ''}`} className={cn('h-[0.8rem] w-[0.8rem] rounded-sm', !done && 'bg-surface-2')} style={done ? { background: h.color } : c ? { background: `${h.color}55` } : undefined} />
-        })}
+    <div className="mt-3">
+      <div ref={scroller} className="overflow-x-auto pb-1">
+        <div className="inline-flex gap-[3px]">
+          <div className="mr-1 flex flex-col gap-[3px] text-[10px] text-subtle">
+            <span className="h-3" />
+            {rows.map((wd) => (
+              <span key={wd} className="h-[11px] leading-[11px]">
+                {[1, 3, 5].includes(wd) ? WEEKDAY_SHORT[wd] : ''}
+              </span>
+            ))}
+          </div>
+          {cols.map((c, w) => (
+            <div key={w} className="flex flex-col gap-[3px]">
+              <span className="relative h-3">
+                {c.month && <span className="absolute left-0 top-0 whitespace-nowrap text-[10px] leading-3 text-subtle">{c.month}</span>}
+              </span>
+              {c.days.map((d, i) => {
+                if (!d) return <span key={i} className="h-[11px] w-[11px]" />
+                const cell = map.get(d)
+                const level = heatLevel(h, cell)
+                const scheduled = habitScheduledOn(h, d)
+                const what = level ? (h.kind === 'numeric' ? `${cell!.value}${h.unit ? ` ${h.unit}` : ''}` : 'done') : scheduled ? 'not done' : 'not scheduled'
+                return <span key={d} title={`${formatKey(d, 'EEE, d MMM yyyy')}: ${what}`} className={cn('h-[11px] w-[11px] rounded-[3px]', HEAT[level], !level && !scheduled && 'opacity-40', d === today && 'ring-1 ring-fg/40')} />
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-subtle">
+        <span>
+          {logged} day{logged === 1 ? '' : 's'} logged in the last year
+        </span>
+        <span className="flex items-center gap-[3px]" aria-hidden>
+          Less
+          {HEAT.map((cls) => (
+            <span key={cls} className={cn('h-[11px] w-[11px] rounded-[3px]', cls)} />
+          ))}
+          More
+        </span>
       </div>
     </div>
   )

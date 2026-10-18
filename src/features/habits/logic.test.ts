@@ -1,4 +1,4 @@
-import { habitStats } from './logic'
+import { habitStats, heatLevel, heatmapWeeks } from './logic'
 import type { Habit, HabitCheckin } from '@/lib/db/types'
 
 const base: Habit = {
@@ -41,5 +41,27 @@ describe('habitStats', () => {
     const s = habitStats(h, ['2026-09-29', '2026-10-01', '2026-10-06', '2026-10-08'].map((d) => ci(d)), '2026-10-11', 1)
     expect(s.unit).toBe('week')
     expect(s.current).toBe(2)
+  })
+})
+
+describe('history grid', () => {
+  it('lays out weeks up to today and labels the months', () => {
+    // Monday-start weeks ending Mon 19 Oct 2026.
+    const cols = heatmapWeeks('2026-10-19', 1, 8)
+    expect(cols).toHaveLength(8)
+    expect(cols[7].days).toEqual(['2026-10-19', null, null, null, null, null, null])
+    expect(cols[0].days[0]).toBe('2026-08-31')
+    expect(cols.map((c) => c.month)).toEqual(['Sep', null, null, null, 'Oct', null, null, null])
+  })
+
+  it('labels the first column when no month starts nearby', () => {
+    expect(heatmapWeeks('2026-10-19', 1, 3)[0].month).toBe('Oct')
+  })
+
+  it('shades by progress for counted habits', () => {
+    const counted = { ...base, kind: 'numeric' as const, target_value: 3 }
+    const c = (value: number) => ({ value }) as HabitCheckin
+    expect([undefined, c(1), c(2), c(3)].map((x) => heatLevel(counted, x))).toEqual([0, 1, 2, 4])
+    expect(heatLevel(base, c(1))).toBe(4)
   })
 })

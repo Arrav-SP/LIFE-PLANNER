@@ -1,5 +1,5 @@
 import type { DateKey, Habit, HabitCheckin } from '@/lib/db/types'
-import { addDays, startOfWeek } from '@/lib/dates'
+import { addDays, formatKey, startOfWeek } from '@/lib/dates'
 import { habitScheduledOn } from '@/features/reminders/sync'
 
 export { habitScheduledOn }
@@ -115,4 +115,32 @@ export function describeSchedule(h: Habit): string {
     case 'interval':
       return s.everyDays === 1 ? 'Every day' : `Every ${s.everyDays} days`
   }
+}
+
+/** How strongly a day shows in the history grid: 0 nothing logged, 4 target met. Numeric habits shade by progress. */
+export function heatLevel(h: Habit, c: HabitCheckin | undefined): 0 | 1 | 2 | 3 | 4 {
+  if (!c || c.value <= 0) return 0
+  if (h.kind !== 'numeric') return 4
+  const r = c.value / (h.target_value ?? 1)
+  return r >= 1 ? 4 : r >= 0.67 ? 3 : r >= 0.34 ? 2 : 1
+}
+
+/**
+ * GitHub-style history: `weeks` columns ending with the week of `today`, each
+ * with its 7 days (null after today). A column is labelled with the month that
+ * starts in it; the first column gets its month too when the next label is far enough away.
+ */
+export function heatmapWeeks(today: DateKey, weekStart: number, weeks: number): { days: (DateKey | null)[]; month: string | null }[] {
+  const first = addDays(startOfWeek(today, weekStart), -(weeks - 1) * 7)
+  const cols = Array.from({ length: weeks }, (_, w) => {
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = addDays(first, w * 7 + i)
+      return d > today ? null : d
+    })
+    const starts = days.find((d) => d?.endsWith('-01'))
+    return { days, month: starts ? formatKey(starts, 'MMM') : null }
+  })
+  const next = cols.findIndex((c) => c.month)
+  if (!cols[0].month && (next < 0 || next >= 3)) cols[0].month = formatKey(first, 'MMM')
+  return cols
 }
