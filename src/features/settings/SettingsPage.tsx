@@ -126,7 +126,7 @@ export function SettingsPage() {
           })}
         </div>
         <p className="mt-2 text-xs text-muted">
-          {ACCENTS.find((a) => a.id === (settings.accent ?? DEFAULT_ACCENT))?.name ?? 'Teal'}. Used for buttons, links and highlights; in light mode it is deepened a little so text stays readable.
+          {ACCENTS.find((a) => a.id === (settings.accent ?? DEFAULT_ACCENT))?.name ?? 'Teal'}. Used for buttons, links and highlights, and in light mode to tint the background. Buttons and links are deepened a little in light mode so text stays readable.
         </p>
       </Panel>
 
