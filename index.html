@@ -19,6 +19,13 @@
         var t = localStorage.getItem('lp-theme') || 'system'
         var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
         if (dark) document.documentElement.classList.add('dark')
+        var accent = localStorage.getItem('lp-accent-css')
+        if (accent) {
+          var s = document.createElement('style')
+          s.id = 'lp-accent'
+          s.textContent = accent
+          document.head.appendChild(s)
+        }
       } catch (e) {}
     </script>
   </head>

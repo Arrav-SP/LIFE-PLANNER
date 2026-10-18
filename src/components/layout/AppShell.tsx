@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { CalendarCheck2, MoreHorizontal, Plus, Search, X } from 'lucide-react'
+import { CalendarCheck2, Moon, MoreHorizontal, Plus, Search, Sun, X } from 'lucide-react'
+import { useSettings } from '@/settings/SettingsProvider'
 import { NAV, MOBILE_TABS } from './nav'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthProvider'
@@ -10,6 +11,18 @@ import { InstallButton } from '@/features/install/InstallButton'
 import { SyncBanner } from '@/features/offline/OfflineSync'
 
 const GROUP_LABEL: Record<string, string> = { main: '', track: 'Track', review: 'Review', system: '' }
+
+/** One tap between light and dark. Settings → Appearance still offers "System". */
+function ThemeToggle() {
+  const { settings, update } = useSettings()
+  const dark = settings.theme === 'dark' || (settings.theme === 'system' && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+  const label = dark ? 'Switch to light mode' : 'Switch to dark mode'
+  return (
+    <button aria-label={label} title={label} className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-2" onClick={() => void update({ theme: dark ? 'light' : 'dark' })}>
+      {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+    </button>
+  )
+}
 
 function SideNav({ onNavigate }: { onNavigate?: () => void }) {
   const groups = ['main', 'track', 'review', 'system'] as const
@@ -116,12 +129,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
           <span className="flex-1 font-semibold">Life Planner</span>
           <InstallButton variant="icon" />
+          <ThemeToggle />
           <ReminderCenter compact />
           <button aria-label="Search" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-2" onClick={() => navigate('/search')}>
             <Search className="h-5 w-5" />
           </button>
         </header>
-        <div className="hidden justify-end px-8 pt-4 md:flex">
+        <div className="hidden items-center justify-end gap-1 px-8 pt-4 md:flex">
+          <ThemeToggle />
           <ReminderCenter />
         </div>
         <SyncBanner />

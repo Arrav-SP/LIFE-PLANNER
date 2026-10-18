@@ -6,6 +6,7 @@ import { browserTimeZone, todayKey } from '@/lib/dates'
 import { useAuth } from '@/auth/AuthProvider'
 import { toast } from '@/components/ui/toast'
 import { errorMessage } from '@/lib/utils'
+import { accentCss } from '@/lib/accents'
 
 export function defaultSettings(userId: string): UserSettings {
   const now = new Date().toISOString()
@@ -40,12 +41,30 @@ interface SettingsCtx {
 
 const Ctx = createContext<SettingsCtx | null>(null)
 const THEME_KEY = 'lp-theme'
+const ACCENT_KEY = 'lp-accent-css'
 
 export function applyTheme(theme: UserSettings['theme']) {
   const dark = theme === 'dark' || (theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
   document.documentElement.classList.toggle('dark', !!dark)
   try {
     localStorage.setItem(THEME_KEY, theme)
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** Swap in the chosen accent colour; index.html re-applies the saved CSS before first paint. */
+export function applyAccent(id: string | undefined) {
+  const css = accentCss(id)
+  let el = document.getElementById('lp-accent')
+  if (!el) {
+    el = document.createElement('style')
+    el.id = 'lp-accent'
+    document.head.appendChild(el)
+  }
+  el.textContent = css
+  try {
+    localStorage.setItem(ACCENT_KEY, css)
   } catch {
     /* storage unavailable */
   }
@@ -81,6 +100,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     mq?.addEventListener?.('change', fn)
     return () => mq?.removeEventListener?.('change', fn)
   }, [settings.theme])
+
+  // Wait for the saved settings, or the colour applied before first paint would flash back to teal.
+  useEffect(() => {
+    if (q.isSuccess) applyAccent(settings.accent)
+  }, [q.isSuccess, settings.accent])
 
   const update = useCallback(
     async (patch: Partial<UserSettings>) => {
