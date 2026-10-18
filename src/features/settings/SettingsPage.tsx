@@ -10,6 +10,7 @@ import { TABLES, type TableName, type UserSettings } from '@/lib/db/types'
 import { browserTimeZone, formatInstant, isValidTimeZone, WEEKDAY_LONG } from '@/lib/dates'
 import { cn, COLOR_SWATCHES, errorMessage, plural } from '@/lib/utils'
 import { env } from '@/lib/env'
+import { ACCENTS, accentColors, DEFAULT_ACCENT } from '@/lib/accents'
 import { useScrollIntoView } from '@/lib/useScrollIntoView'
 import { Button } from '@/components/ui/Button'
 import { confirm } from '@/components/ui/Dialog'
@@ -104,6 +105,28 @@ export function SettingsPage() {
         <p className="mt-2 flex items-center gap-2 text-xs text-muted">
           {settings.theme === 'light' ? <Sun className="h-3.5 w-3.5" /> : settings.theme === 'dark' ? <Moon className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
           {settings.theme === 'system' ? 'Follows your device setting.' : `Always ${settings.theme}.`}
+        </p>
+        <p className="mb-2 mt-5 text-sm font-medium">Accent colour</p>
+        <div role="radiogroup" aria-label="Accent colour" className="flex flex-wrap gap-2">
+          {ACCENTS.map((a) => {
+            const on = (settings.accent ?? DEFAULT_ACCENT) === a.id
+            return (
+              <button
+                key={a.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-label={a.name}
+                title={a.name}
+                onClick={() => set('accent', a.id)}
+                className={cn('h-8 w-8 rounded-full border border-line ring-offset-2 ring-offset-surface transition', on ? 'ring-2 ring-fg' : 'hover:scale-110')}
+                style={{ background: `rgb(${accentColors(a).swatch.join(' ')})` }}
+              />
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          {ACCENTS.find((a) => a.id === (settings.accent ?? DEFAULT_ACCENT))?.name ?? 'Teal'}. Used for buttons, links and highlights; in light mode it is deepened a little so text stays readable.
         </p>
       </Panel>
 

@@ -45,6 +45,8 @@ Open http://localhost:5173. Without Supabase keys the app runs in **local mode**
 2. Create the database tables. Either:
    - open **SQL Editor**, paste the whole of `supabase/migrations/20261012000000_initial_schema.sql`, and run it, or
    - with the [Supabase CLI](https://supabase.com/docs/guides/cli): `npx supabase login`, `npx supabase link --project-ref <your-ref>`, then `npx supabase db push`.
+
+   With the SQL Editor, also run `supabase/migrations/20261019000000_accent.sql` (the accent colour in Settings → Appearance).
 3. Under **Authentication → Sign In / Providers → Email**, keep email sign-in on. Supabase's built-in email sender only sends a handful of emails per hour. For a personal app, either:
    - turn **Confirm email** off, so you can sign in straight after signing up, or
    - leave it on and sign up with the email address that owns the Supabase account.

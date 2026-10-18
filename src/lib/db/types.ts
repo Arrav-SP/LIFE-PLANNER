@@ -53,6 +53,8 @@ export interface UserSettings {
   calendar_feed_token?: string | null
   /** Other calendars shown read-only in the app (needs the calendar_links migration). */
   calendar_links?: CalendarLinkSetting[]
+  /** Accent colour id from src/lib/accents.ts (needs the accent migration). */
+  accent?: string
   created_at: Instant
   updated_at: Instant
 }
