@@ -1,4 +1,4 @@
-import { layoutLanes, placeAll, suggestSlot } from './logic'
+import { dropMinute, layoutLanes, parsePlanDrop, placeAll, suggestSlot } from './logic'
 
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 12, h, m))
 
@@ -40,5 +40,28 @@ describe('placeAll', () => {
       ['b', at(11).getTime(), at(11, 30).getTime()],
     ])
     expect(unplaced.map((u) => u.id)).toEqual(['c'])
+  })
+})
+
+describe('drag onto the timeline', () => {
+  it('lands in the 15-minute row under the pointer, inside the day', () => {
+    expect(dropMinute(0, 56, 15 * 60)).toBe(0)
+    expect(dropMinute(56 * 2.4, 56, 15 * 60)).toBe(135) // 2h24m down -> 2:15 row
+    expect(dropMinute(-20, 56, 15 * 60)).toBe(0)
+    expect(dropMinute(56 * 99, 56, 15 * 60)).toBe(15 * 60 - 15)
+  })
+
+  it('accepts only well-formed items', () => {
+    expect(parsePlanDrop(JSON.stringify({ title: ' Study: OS ', minutes: 60, color: '#7c3aed', task_id: '' }))).toEqual({
+      title: 'Study: OS',
+      minutes: 60,
+      task_id: null,
+      task_occurrence_date: null,
+      category_id: null,
+      color: '#7c3aed',
+    })
+    expect(parsePlanDrop('not json')).toBeNull()
+    expect(parsePlanDrop(JSON.stringify({ title: 'x', minutes: 9999 }))).toBeNull()
+    expect(parsePlanDrop(JSON.stringify({ title: 'x', minutes: 30, color: 'red;}' }))?.color).toBeNull()
   })
 })

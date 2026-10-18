@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type DragEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, CalendarClock, Check, ChevronLeft, ChevronRight, Clock, Plus, Repeat, Wand2, X } from 'lucide-react'
 import { useSettings, useMinuteTick } from '@/settings/SettingsProvider'
@@ -20,10 +20,22 @@ import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { expandBlocks, expandEvents, freeSlots } from '@/features/calendar/logic'
 import { checkinMap, habitScheduledOn, isComplete } from '@/features/habits/logic'
 import { useHabitActions } from '@/features/habits/actions'
-import { dayWindow, layoutLanes, suggestSlot } from './logic'
+import { dayWindow, dropMinute, layoutLanes, parsePlanDrop, PLAN_DRAG_TYPE, suggestSlot, type PlanDrop } from './logic'
 import { BlockEditor, type BlockTarget } from './BlockEditor'
 
 const HOUR_PX = 56
+
+/** Props that make a side-panel item draggable onto the day timeline. */
+function dragPlan(p: PlanDrop) {
+  return {
+    draggable: true,
+    title: 'Drag onto the timeline',
+    onDragStart: (e: DragEvent) => {
+      e.dataTransfer.setData(PLAN_DRAG_TYPE, JSON.stringify(p))
+      e.dataTransfer.effectAllowed = 'copy'
+    },
+  }
+}
 
 interface Item {
   key: string
@@ -161,6 +173,10 @@ function DayPlan({
   const invalidate = useInvalidate()
   const habits = useList('habits', { filters: [isNull('archived_at')], order: [{ field: 'sort_order' }] })
   const checkins = useList('habit_checkins', { filters: [gte('date', addDays(date, -7))] })
+  const goals = useList('goals', { filters: [isNull('archived_at')] })
+  const subjects = useList('subjects', { filters: [isNull('archived_at')] })
+  // Minutes after the day start where a dragged item would land, while one is over the timeline.
+  const [dropAt, setDropAt] = useState<number | null>(null)
 
   const startHour = Math.min(settings.day_start_hour, 23)
   const endHour = Math.max(settings.day_end_hour, startHour + 1)
@@ -190,16 +206,45 @@ function DayPlan({
   const scheduleTask = (i: TaskInstance, slot: { start: Date; end: Date }) =>
     onBlock({ date, start: timeOf(slot.start, tz), end: timeOf(slot.end, tz), title: i.task.title, task_id: i.task.id, task_occurrence_date: i.occurrenceDate })
 
-  const autoPlace = async (i: TaskInstance) => {
-    const slot = suggestSlot(free, i.task.estimated_minutes || settings.default_task_minutes, isToday ? now : dayStart)
-    if (!slot) return toast.info('No free slot long enough today. Try tomorrow or shorten the estimate.')
+  const placeBlock = async (p: PlanDrop, start: Date) => {
     try {
-      await getStore().insert('time_blocks', { title: i.task.title, start_at: slot.start.toISOString(), end_at: slot.end.toISOString(), task_id: i.task.id, task_occurrence_date: i.occurrenceDate, status: 'planned', notes: '', color: null, category_id: i.task.category_id, recurrence: null })
+      await getStore().insert('time_blocks', {
+        title: p.title,
+        start_at: start.toISOString(),
+        end_at: new Date(start.getTime() + p.minutes * 60000).toISOString(),
+        task_id: p.task_id ?? null,
+        task_occurrence_date: p.task_occurrence_date ?? null,
+        category_id: p.category_id ?? null,
+        color: p.color ?? null,
+        status: 'planned',
+        notes: '',
+        recurrence: null,
+      })
       invalidate('time_blocks')
-      toast.success(`Planned for ${formatTime(slot.start, tz, settings.time_format)}`)
+      toast.success(`Planned “${p.title}” for ${formatTime(start, tz, settings.time_format)}`)
     } catch (e) {
       toast.error(errorMessage(e))
     }
+  }
+
+  const taskPlan = (i: TaskInstance): PlanDrop => ({
+    title: i.task.title,
+    minutes: i.task.estimated_minutes || settings.default_task_minutes,
+    task_id: i.task.id,
+    task_occurrence_date: i.occurrenceDate,
+    category_id: i.task.category_id,
+  })
+
+  const autoPlace = async (i: TaskInstance) => {
+    const slot = suggestSlot(free, i.task.estimated_minutes || settings.default_task_minutes, isToday ? now : dayStart)
+    if (!slot) return toast.info('No free slot long enough today. Try tomorrow or shorten the estimate.')
+    await placeBlock(taskPlan(i), slot.start)
+  }
+
+  /** Tap instead of drag (phones, keyboard): open the block editor at the next free slot. */
+  const openPlan = (p: PlanDrop) => {
+    const slot = suggestSlot(free, p.minutes, isToday ? now : dayStart) ?? { start: dayStart, end: new Date(dayStart.getTime() + p.minutes * 60000) }
+    onBlock({ date, start: timeOf(slot.start, tz), end: timeOf(slot.end, tz), title: p.title })
   }
 
   const setBlockStatus = async (b: TimeBlock, status: TimeBlock['status']) => {
@@ -235,6 +280,9 @@ function DayPlan({
 
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
   const top = (d: Date) => ((d.getTime() - dayStart.getTime()) / 3600000) * HOUR_PX
+  const dragMinute = (e: DragEvent<HTMLDivElement>) => dropMinute(e.clientY - e.currentTarget.getBoundingClientRect().top, HOUR_PX, hours.length * 60)
+  const planGoals = (goals.data ?? []).filter((g) => g.status === 'active')
+  const planSubjects = subjects.data ?? []
   const dueHabits = (habits.data ?? []).filter((h) => h.show_in_planner && (h.schedule.type === 'weekly' || habitScheduledOn(h, date)))
 
   return (
@@ -247,7 +295,7 @@ function DayPlan({
           <span>
             <strong className="text-fg">{formatMinutes(Math.round(freeMinutes)) || '0m'}</strong> free{isToday ? ' from now' : ''}
           </span>
-          <span className="ml-auto hidden sm:inline">Click an empty hour to add a block</span>
+          <span className="ml-auto hidden sm:inline">Click an empty hour, or drag items from the right onto a time</span>
         </div>
         {allDay.length > 0 && (
           <div className="flex flex-wrap gap-1.5 border-b border-line px-3 py-2">
@@ -258,7 +306,25 @@ function DayPlan({
             ))}
           </div>
         )}
-        <div className="relative mb-3 ml-14 mr-2 mt-3" style={{ height: hours.length * HOUR_PX }}>
+        <div
+          className="relative mb-3 ml-14 mr-2 mt-3"
+          style={{ height: hours.length * HOUR_PX }}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes(PLAN_DRAG_TYPE)) return
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'copy'
+            setDropAt(dragMinute(e))
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropAt(null)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDropAt(null)
+            const p = parsePlanDrop(e.dataTransfer.getData(PLAN_DRAG_TYPE))
+            if (p) void placeBlock(p, new Date(dayStart.getTime() + dragMinute(e) * 60000))
+          }}
+        >
           {hours.map((h, idx) => (
             <button
               key={h}
@@ -307,6 +373,13 @@ function DayPlan({
             )
           })}
           {isToday && now > dayStart && now < dayEnd && <div className="pointer-events-none absolute -left-1 right-0 z-10 h-0.5 bg-danger" style={{ top: top(now) }} aria-hidden />}
+          {dropAt !== null && (
+            <div className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-dashed border-accent" style={{ top: (dropAt / 60) * HOUR_PX }} aria-hidden>
+              <span className="absolute -top-2.5 right-1 rounded bg-accent px-1.5 text-[11px] font-medium text-accent-fg tabular">
+                {formatTime(new Date(dayStart.getTime() + dropAt * 60000), tz, settings.time_format)}
+              </span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -349,7 +422,7 @@ function DayPlan({
                 const mins = i.task.estimated_minutes || settings.default_task_minutes
                 const slot = suggestSlot(free, mins, isToday ? now : dayStart)
                 return (
-                  <li key={i.key} className="rounded-lg px-2 py-2 hover:bg-surface-2">
+                  <li key={i.key} className="cursor-grab rounded-lg px-2 py-2 hover:bg-surface-2 active:cursor-grabbing" {...dragPlan(taskPlan(i))}>
                     <button type="button" className="block w-full truncate text-left text-sm" onClick={() => onTask(i)}>
                       {i.task.title}
                     </button>
@@ -404,7 +477,7 @@ function DayPlan({
                 const c = checkinMap(checkins.data ?? [], h.id).get(date)
                 const done = isComplete(h, c)
                 return (
-                  <li key={h.id} className="flex items-center gap-3 text-sm">
+                  <li key={h.id} className="flex cursor-grab items-center gap-3 text-sm active:cursor-grabbing" {...dragPlan({ title: h.name, minutes: settings.default_task_minutes, color: h.color })}>
                     <Checkbox round checked={done} label={`Check in ${h.name}`} disabled={date > today} onChange={() => void habitActions.toggle(h, date, c)} />
                     <Link to={linkTo.habit(h.id)} className="min-w-0 flex-1 truncate hover:underline">
                       {h.name}
@@ -413,6 +486,30 @@ function DayPlan({
                   </li>
                 )
               })}
+            </ul>
+          </Panel>
+        )}
+
+        {(planGoals.length > 0 || planSubjects.length > 0) && (
+          <Panel title="Goals & study">
+            <p className="mb-2 text-xs text-muted">Drag one onto the timeline to block time for it, or tap to pick a time.</p>
+            <ul className="flex flex-wrap gap-1.5">
+              {[
+                ...planSubjects.map((s) => ({ key: s.id, plan: { title: `Study: ${s.name}`, minutes: 60, color: s.color } })),
+                ...planGoals.map((g) => ({ key: g.id, plan: { title: g.title, minutes: 60, color: g.color } })),
+              ].map(({ key, plan }) => (
+                <li key={key}>
+                  <button
+                    type="button"
+                    className="flex max-w-full cursor-grab items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs hover:bg-surface-2 active:cursor-grabbing"
+                    onClick={() => openPlan(plan)}
+                    {...dragPlan(plan)}
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: plan.color }} aria-hidden />
+                    <span className="truncate">{plan.title}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </Panel>
         )}
