@@ -20,7 +20,7 @@ import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { expandBlocks, expandEvents, freeSlots } from '@/features/calendar/logic'
 import { checkinMap, habitScheduledOn, isComplete } from '@/features/habits/logic'
 import { useHabitActions } from '@/features/habits/actions'
-import { dayWindow, dropMinute, layoutLanes, parsePlanDrop, PLAN_DRAG_TYPE, suggestSlot, type PlanDrop } from './logic'
+import { dayWindow, dropMinute, hhmm, layoutLanes, parsePlanDrop, parsePlanMove, PLAN_DRAG_TYPE, PLAN_MOVE_TYPE, suggestSlot, type PlanDrop, type PlanMove } from './logic'
 import { BlockEditor, type BlockTarget } from './BlockEditor'
 
 const HOUR_PX = 56
@@ -177,6 +177,9 @@ function DayPlan({
   const subjects = useList('subjects', { filters: [isNull('archived_at')] })
   // Minutes after the day start where a dragged item would land, while one is over the timeline.
   const [dropAt, setDropAt] = useState<number | null>(null)
+  // An item from the timeline is being dragged (shows the "drop here to unschedule" area), and whether it's over it.
+  const [moving, setMoving] = useState(false)
+  const [unplanOver, setUnplanOver] = useState(false)
 
   const startHour = Math.min(settings.day_start_hour, 23)
   const endHour = Math.max(settings.day_end_hour, startHour + 1)
@@ -280,6 +283,49 @@ function DayPlan({
 
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
   const top = (d: Date) => ((d.getTime() - dayStart.getTime()) / 3600000) * HOUR_PX
+  const slots = Array.from({ length: hours.length * 2 }, (_, k) => startHour * 60 + k * 30)
+  const findItem = (m: PlanMove) => timed.find((t) => (m.kind === 'block' ? t.block?.id === m.id && !t.block.virtual : t.task?.task.id === m.id))
+
+  const moveItem = async (m: PlanMove, start: Date) => {
+    const it = findItem(m)
+    if (!it) return
+    const ms = it.end.getTime() - it.start.getTime()
+    try {
+      if (it.block) {
+        await getStore().update('time_blocks', it.block.id, { start_at: start.toISOString(), end_at: new Date(start.getTime() + ms).toISOString() })
+        invalidate('time_blocks')
+      } else if (it.task) await taskActions.update(it.task.task, { scheduled_at: start.toISOString() })
+      toast.success(`Moved to ${formatTime(start, tz, settings.time_format)}`)
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
+  /** Dragged back to the side panel: the block goes (with undo); a scheduled task loses its time and returns to To schedule. */
+  const unplanItem = async (m: PlanMove) => {
+    const it = findItem(m)
+    if (!it) return
+    try {
+      if (it.block) {
+        const b = it.block
+        await getStore().remove('time_blocks', b.id)
+        invalidate('time_blocks')
+        toast.success(`Took “${it.title}” off the timeline`, {
+          label: 'Undo',
+          onClick: () =>
+            void getStore()
+              .insert('time_blocks', { id: b.id, title: b.title, start_at: b.start_at, end_at: b.end_at, task_id: b.task_id, task_occurrence_date: b.task_occurrence_date, category_id: b.category_id, color: b.color, notes: b.notes, status: b.status, actual_minutes: b.actual_minutes, recurrence: b.recurrence })
+              .then(() => invalidate('time_blocks')),
+        })
+      } else if (it.task) {
+        const t = it.task.task
+        await taskActions.update(t, { scheduled_at: null, due_date: t.due_date ?? date }, `Took “${it.title}” off the timeline`)
+      }
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
   const dragMinute = (e: DragEvent<HTMLDivElement>) => dropMinute(e.clientY - e.currentTarget.getBoundingClientRect().top, HOUR_PX, hours.length * 60)
   const planGoals = (goals.data ?? []).filter((g) => g.status === 'active')
   const planSubjects = subjects.data ?? []
@@ -295,7 +341,7 @@ function DayPlan({
           <span>
             <strong className="text-fg">{formatMinutes(Math.round(freeMinutes)) || '0m'}</strong> free{isToday ? ' from now' : ''}
           </span>
-          <span className="ml-auto hidden sm:inline">Click an empty hour, or drag items from the right onto a time</span>
+          <span className="ml-auto hidden sm:inline">Click a slot or drag items in; drag them back to the right to unschedule</span>
         </div>
         {allDay.length > 0 && (
           <div className="flex flex-wrap gap-1.5 border-b border-line px-3 py-2">
@@ -310,9 +356,10 @@ function DayPlan({
           className="relative mb-3 ml-14 mr-2 mt-3"
           style={{ height: hours.length * HOUR_PX }}
           onDragOver={(e) => {
-            if (!e.dataTransfer.types.includes(PLAN_DRAG_TYPE)) return
+            const move = e.dataTransfer.types.includes(PLAN_MOVE_TYPE)
+            if (!move && !e.dataTransfer.types.includes(PLAN_DRAG_TYPE)) return
             e.preventDefault()
-            e.dataTransfer.dropEffect = 'copy'
+            e.dataTransfer.dropEffect = move ? 'move' : 'copy'
             setDropAt(dragMinute(e))
           }}
           onDragLeave={(e) => {
@@ -321,23 +368,34 @@ function DayPlan({
           onDrop={(e) => {
             e.preventDefault()
             setDropAt(null)
+            setMoving(false)
+            const at = new Date(dayStart.getTime() + dragMinute(e) * 60000)
+            const m = parsePlanMove(e.dataTransfer.getData(PLAN_MOVE_TYPE))
+            if (m) return void moveItem(m, at)
             const p = parsePlanDrop(e.dataTransfer.getData(PLAN_DRAG_TYPE))
-            if (p) void placeBlock(p, new Date(dayStart.getTime() + dragMinute(e) * 60000))
+            if (p) void placeBlock(p, at)
           }}
         >
-          {hours.map((h, idx) => (
-            <button
-              key={h}
-              type="button"
-              aria-label={`Add block at ${String(h).padStart(2, '0')}:00`}
-              onClick={() => onBlock({ date, start: `${String(h).padStart(2, '0')}:00`, end: `${String(Math.min(h + 1, 23)).padStart(2, '0')}:${h + 1 > 23 ? '59' : '00'}` })}
-              className="absolute inset-x-0 border-t border-line/70 text-left hover:bg-surface-2/60"
-              style={{ top: idx * HOUR_PX, height: HOUR_PX }}
-            >
-              <span className="absolute -left-14 -top-2 w-12 pr-2 text-right text-[11px] tabular text-subtle">{formatTime(zonedToInstant(date, `${String(h).padStart(2, '0')}:00`, tz), tz, settings.time_format === 'HH:mm' ? 'HH:mm' : 'h a')}</span>
-            </button>
-          ))}
+          {slots.map((min, idx) => {
+            const label = hhmm(min)
+            const half = min % 60 !== 0
+            return (
+              <button
+                key={min}
+                type="button"
+                aria-label={`Add block at ${label}`}
+                onClick={() => onBlock({ date, start: label, end: hhmm(Math.min(min + 60, 23 * 60 + 59)) })}
+                className={cn('absolute inset-x-0 border-t text-left hover:bg-surface-2/60', half ? 'border-dashed border-line/40' : 'border-line/70')}
+                style={{ top: idx * (HOUR_PX / 2), height: HOUR_PX / 2 }}
+              >
+                <span className={cn('absolute -left-14 -top-2 w-12 pr-2 text-right tabular', half ? 'text-[10px] text-subtle/70' : 'text-[11px] text-subtle')}>
+                  {formatTime(zonedToInstant(date, label, tz), tz, settings.time_format === 'HH:mm' ? 'HH:mm' : half ? 'h:mm a' : 'h a')}
+                </span>
+              </button>
+            )
+          })}
           {laid.map((it) => {
+            const movable = it.block ? !it.block.recurrence && !it.block.virtual : !!it.task && !it.task.task.recurrence
             const t = Math.max(0, top(it.start))
             const h = Math.max(22, Math.min(top(it.end), hours.length * HOUR_PX) - t)
             if (top(it.end) <= 0 || t >= hours.length * HOUR_PX) return null
@@ -345,7 +403,23 @@ function DayPlan({
             return (
               <div
                 key={it.key}
-                className={cn('absolute overflow-hidden rounded-md border-l-4 px-2 py-1 text-xs shadow-sm', it.kind === 'task' ? 'border border-dashed bg-surface' : 'bg-surface-2', it.done && 'opacity-60')}
+                {...(movable
+                  ? {
+                      draggable: true,
+                      title: 'Drag to move, or drag to the right to unschedule',
+                      onDragStart: (e: DragEvent) => {
+                        e.dataTransfer.setData(PLAN_MOVE_TYPE, JSON.stringify({ kind: it.block ? 'block' : 'task', id: it.block ? it.block.id : it.task!.task.id }))
+                        e.dataTransfer.effectAllowed = 'move'
+                        setMoving(true)
+                      },
+                      onDragEnd: () => {
+                        setMoving(false)
+                        setUnplanOver(false)
+                        setDropAt(null)
+                      },
+                    }
+                  : {})}
+                className={cn('absolute overflow-hidden rounded-md border-l-4 px-2 py-1 text-xs shadow-sm', it.kind === 'task' ? 'border border-dashed bg-surface' : 'bg-surface-2', it.done && 'opacity-60', movable && 'cursor-grab active:cursor-grabbing')}
                 style={{ top: t + 1, height: h - 2, left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`, width: `calc(${100 / it.lanes}% - 4px)`, borderLeftColor: color }}
               >
                 <div className="flex items-start gap-1">
@@ -383,7 +457,30 @@ function DayPlan({
         </div>
       </section>
 
-      <aside className="flex min-w-0 flex-col gap-4">
+      <aside
+        className={cn('flex min-w-0 flex-col gap-4 rounded-xl transition', unplanOver && 'ring-2 ring-accent ring-offset-4 ring-offset-bg')}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes(PLAN_MOVE_TYPE)) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          setUnplanOver(true)
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setUnplanOver(false)
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          setUnplanOver(false)
+          setMoving(false)
+          const m = parsePlanMove(e.dataTransfer.getData(PLAN_MOVE_TYPE))
+          if (m) void unplanItem(m)
+        }}
+      >
+        {moving && (
+          <div className={cn('rounded-xl border-2 border-dashed px-4 py-6 text-center text-sm', unplanOver ? 'border-accent bg-accent-soft text-fg' : 'border-line text-muted')}>
+            Drop here to take it off the timeline
+          </div>
+        )}
         {missed.length > 0 && (
           <Panel
             title={

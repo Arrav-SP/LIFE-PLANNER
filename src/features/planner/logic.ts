@@ -94,6 +94,26 @@ export function parsePlanDrop(raw: string): PlanDrop | null {
   }
 }
 
+/** A block or scheduled task already on the timeline, dragged to a new time or back to the side panel. */
+export interface PlanMove {
+  kind: 'block' | 'task'
+  id: string
+}
+
+export const PLAN_MOVE_TYPE = 'application/x-life-planner-move'
+
+export function parsePlanMove(raw: string): PlanMove | null {
+  try {
+    const p = JSON.parse(raw) as Record<string, unknown>
+    return (p.kind === 'block' || p.kind === 'task') && typeof p.id === 'string' && p.id ? { kind: p.kind, id: p.id } : null
+  } catch {
+    return null
+  }
+}
+
+/** Minutes since midnight as HH:mm. */
+export const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+
 /** Minutes after the day start under a drop `y` px down the timeline: the 15-minute row it lands in, kept inside the day. */
 export function dropMinute(y: number, hourPx: number, dayMinutes: number): number {
   return Math.max(0, Math.min(dayMinutes - 15, Math.floor((y / hourPx) * 4) * 15))

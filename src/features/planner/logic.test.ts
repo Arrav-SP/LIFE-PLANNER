@@ -1,4 +1,4 @@
-import { dropMinute, layoutLanes, parsePlanDrop, placeAll, suggestSlot } from './logic'
+import { dropMinute, hhmm, layoutLanes, parsePlanDrop, parsePlanMove, placeAll, suggestSlot } from './logic'
 
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 12, h, m))
 
@@ -63,5 +63,18 @@ describe('drag onto the timeline', () => {
     expect(parsePlanDrop('not json')).toBeNull()
     expect(parsePlanDrop(JSON.stringify({ title: 'x', minutes: 9999 }))).toBeNull()
     expect(parsePlanDrop(JSON.stringify({ title: 'x', minutes: 30, color: 'red;}' }))?.color).toBeNull()
+  })
+})
+
+describe('moving timeline items', () => {
+  it('reads a dragged block or task, and nothing else', () => {
+    expect(parsePlanMove(JSON.stringify({ kind: 'block', id: 'b1' }))).toEqual({ kind: 'block', id: 'b1' })
+    expect(parsePlanMove(JSON.stringify({ kind: 'event', id: 'e1' }))).toBeNull()
+    expect(parsePlanMove(JSON.stringify({ kind: 'task', id: '' }))).toBeNull()
+    expect(parsePlanMove('{')).toBeNull()
+  })
+
+  it('labels half-hour slots', () => {
+    expect([420, 450, 1410].map(hhmm)).toEqual(['07:00', '07:30', '23:30'])
   })
 })
