@@ -310,6 +310,8 @@ export interface Subject extends BaseRow {
   goal_id: ID | null
   project_id: ID | null
   archived_at: Instant | null
+  /** Exam or finish-by date for the study pace (needs the subject_target_date migration). */
+  target_date?: DateKey | null
 }
 
 export interface StudyTopic extends BaseRow {

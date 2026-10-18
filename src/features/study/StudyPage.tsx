@@ -509,6 +509,7 @@ const subjectSchema = z.object({
   weekly_target_hours: z.string().refine((s) => s.trim() === '' || (Number(s) > 0 && Number(s) <= 100), 'Enter hours between 0 and 100.'),
   color: z.string(),
   goal_id: z.string(),
+  target_date: z.string(),
 })
 type SubjectForm = z.infer<typeof subjectSchema>
 
@@ -522,6 +523,7 @@ function SubjectEditor({ open, onClose, subject }: { open: boolean; onClose: () 
     weekly_target_hours: subject?.weekly_target_minutes ? String(+(subject.weekly_target_minutes / 60).toFixed(2)) : '',
     color: subject?.color ?? '#0891b2',
     goal_id: subject?.goal_id ?? '',
+    target_date: subject?.target_date ?? '',
   })
   const { register, handleSubmit, control, reset, formState } = useForm<SubjectForm>({ resolver: zodResolver(subjectSchema), defaultValues: defaults() })
   useEffect(() => {
@@ -529,7 +531,9 @@ function SubjectEditor({ open, onClose, subject }: { open: boolean; onClose: () 
   }, [open, subject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = handleSubmit(async (f) => {
-    const values = { name: f.name.trim(), kind: f.kind, description: f.description, weekly_target_minutes: f.weekly_target_hours.trim() ? Math.round(Number(f.weekly_target_hours) * 60) : null, color: f.color, goal_id: f.goal_id || null }
+    const values: Partial<Subject> = { name: f.name.trim(), kind: f.kind, description: f.description, weekly_target_minutes: f.weekly_target_hours.trim() ? Math.round(Number(f.weekly_target_hours) * 60) : null, color: f.color, goal_id: f.goal_id || null }
+    // Only sent when changed, so subjects still save before the exam-date migration has run.
+    if (f.target_date !== (subject?.target_date ?? '')) values.target_date = f.target_date || null
     try {
       if (subject) await getStore().update('subjects', subject.id, values)
       else await getStore().insert('subjects', values)
@@ -586,7 +590,10 @@ function SubjectEditor({ open, onClose, subject }: { open: boolean; onClose: () 
         <Field label="Weekly target (hours)" htmlFor="s-target" error={formState.errors.weekly_target_hours?.message}>
           <Input id="s-target" inputMode="decimal" placeholder="e.g. 6" {...register('weekly_target_hours')} />
         </Field>
-        <Field label="Goal" htmlFor="s-goal" className="col-span-2">
+        <Field label="Exam / finish by" htmlFor="s-exam" hint="Optional. The Coach paces your study to this date.">
+          <Input id="s-exam" type="date" {...register('target_date')} />
+        </Field>
+        <Field label="Goal" htmlFor="s-goal">
           <Select id="s-goal" {...register('goal_id')}>
             <option value="">None</option>
             {goals.map((g) => (

@@ -117,6 +117,24 @@ Setup, once:
 
 Real-time two-way sync would need Google's Calendar API and a Google Cloud project, so it isn't used.
 
+## 7. Optional: AI coach (free, Groq)
+
+The Coach page's **Ask the coach** button sends the same summary as "Copy for Claude" to a free AI model on [Groq](https://console.groq.com) and shows its written plan. Groq's free tier needs no card; its limits (requests per minute and per day) are shown under Limits in the Groq console and are far more than one person needs.
+
+1. Sign in at console.groq.com and create an API key.
+2. Store it as a Supabase function secret (never in `.env.local`):
+
+   ```bash
+   npx supabase secrets set GROQ_API_KEY=<your-groq-key>
+   ```
+
+   Optionally set `GROQ_MODEL` to another Groq model id; the default is `openai/gpt-oss-120b`.
+3. Deploy the function: `npx supabase functions deploy coach --no-verify-jwt`. The function checks the signed-in user itself. Without the CLI, create a function named `coach` in the dashboard, paste the whole of `supabase/functions/coach/index.ts`, and turn off **Verify JWT** in its settings.
+
+The function only answers signed-in users of your app. Your summary (task titles, subjects, habits, goals) is sent to Groq for each request.
+
+Also run `supabase/migrations/20261020000000_subject_target_date.sql` in the SQL Editor so subjects can have an exam date.
+
 ## Free-tier limits worth knowing
 
 - **Supabase Free:** 500 MB database, 50,000 monthly active users, 500,000 Edge Function calls a month, and 2 free projects. **A Free project pauses after 7 days without activity.** Opening the app counts as activity. If it does pause, press Restore in the dashboard; your data is kept.

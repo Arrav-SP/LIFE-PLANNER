@@ -20,7 +20,7 @@ import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { expandBlocks, expandEvents, freeSlots } from '@/features/calendar/logic'
 import { checkinMap, habitScheduledOn, isComplete } from '@/features/habits/logic'
 import { useHabitActions } from '@/features/habits/actions'
-import { layoutLanes, suggestSlot } from './logic'
+import { dayWindow, layoutLanes, suggestSlot } from './logic'
 import { BlockEditor, type BlockTarget } from './BlockEditor'
 
 const HOUR_PX = 56
@@ -164,8 +164,7 @@ function DayPlan({
 
   const startHour = Math.min(settings.day_start_hour, 23)
   const endHour = Math.max(settings.day_end_hour, startHour + 1)
-  const dayStart = zonedToInstant(date, `${String(startHour).padStart(2, '0')}:00`, tz)
-  const dayEnd = endHour >= 24 ? zonedToInstant(addDays(date, 1), '00:00', tz) : zonedToInstant(date, `${String(endHour).padStart(2, '0')}:00`, tz)
+  const { dayStart, dayEnd } = dayWindow(date, settings.day_start_hour, settings.day_end_hour, tz)
   const timed = items.filter((i) => !i.allDay)
   const allDay = items.filter((i) => i.allDay)
   const laid = layoutLanes(timed)
