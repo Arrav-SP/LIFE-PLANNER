@@ -62,6 +62,43 @@ export function placeAll<T extends { minutes: number }>(free: { start: Date; end
   return { placed, unplaced }
 }
 
+/** Something dragged from the planner's side panels onto the day timeline; becomes a time block. */
+export interface PlanDrop {
+  title: string
+  minutes: number
+  task_id?: string | null
+  task_occurrence_date?: string | null
+  category_id?: string | null
+  color?: string | null
+}
+
+export const PLAN_DRAG_TYPE = 'application/x-life-planner-block'
+
+const idOrNull = (v: unknown) => (typeof v === 'string' && v ? v : null)
+
+/** A dragged item, or null for anything that isn't one of ours (drags can come from other pages too). */
+export function parsePlanDrop(raw: string): PlanDrop | null {
+  try {
+    const p = JSON.parse(raw) as Record<string, unknown>
+    if (typeof p.title !== 'string' || !p.title.trim() || typeof p.minutes !== 'number' || !(p.minutes >= 5 && p.minutes <= 720)) return null
+    return {
+      title: p.title.trim().slice(0, 200),
+      minutes: Math.round(p.minutes),
+      task_id: idOrNull(p.task_id),
+      task_occurrence_date: idOrNull(p.task_occurrence_date),
+      category_id: idOrNull(p.category_id),
+      color: typeof p.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color) ? p.color : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Minutes after the day start under a drop `y` px down the timeline: the 15-minute row it lands in, kept inside the day. */
+export function dropMinute(y: number, hourPx: number, dayMinutes: number): number {
+  return Math.max(0, Math.min(dayMinutes - 15, Math.floor((y / hourPx) * 4) * 15))
+}
+
 /** The first free slot that fits `minutes`, starting no earlier than `after`. */
 export function suggestSlot(free: { start: Date; end: Date }[], minutes: number, after: Date): { start: Date; end: Date } | null {
   const need = minutes * 60000
