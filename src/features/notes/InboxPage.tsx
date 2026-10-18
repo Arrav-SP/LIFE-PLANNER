@@ -16,6 +16,7 @@ import { Badge, EmptyState, PageHeader, Segmented } from '@/components/ui/misc'
 import { toast } from '@/components/ui/toast'
 import type { Note, NoteKind } from '@/lib/db/types'
 import { parseQuickEntry } from '@/features/tasks/parse'
+import { parseCapture } from './logic'
 import { useTaskActions } from '@/features/tasks/actions'
 import { EventEditor, type EditorTarget } from '@/features/calendar/EventEditor'
 import { CustomReminderDialog } from '@/features/reminders/RemindersPage'
@@ -27,7 +28,7 @@ export function InboxPage() {
   const [tab, setTab] = useState<'inbox' | 'processed' | 'archived'>('inbox')
   const [q, setQ] = useState('')
   const [text, setText] = useState('')
-  const [kind, setKind] = useState<NoteKind>('note')
+  const [kind, setKind] = useState<'note' | 'idea'>('note')
   const [editing, setEditing] = useState<Note | null>(null)
   const [eventFor, setEventFor] = useState<{ note: Note; target: EditorTarget } | null>(null)
   const [reminderFor, setReminderFor] = useState<Note | null>(null)
@@ -67,25 +68,19 @@ export function InboxPage() {
     }
   }
 
-  const capture = () => {
-    const t = text.trim()
-    if (!t) return
-    const isUrl = /^https?:\/\/\S+$/i.test(t)
-    const tags = [...t.matchAll(/(^|\s)#([\p{L}\p{N}_-]+)/gu)].map((m) => m[2].toLowerCase())
-    const [first, ...rest] = t.split('\n')
-    void run(
-      () =>
-        getStore().insert('notes', {
-          kind: isUrl ? 'link' : kind,
-          title: first.slice(0, 300),
-          content: rest.join('\n').trim(),
-          url: isUrl ? t : '',
-          tags,
-          status: 'inbox',
-          pinned: false,
-        }),
-      'Captured',
-    ).then(() => setText(''))
+  const capture = async () => {
+    if (!text.trim()) return
+    try {
+      await getStore().insert('notes', { ...parseCapture(text, kind), status: 'inbox', pinned: false })
+      toast.success('Captured')
+      // Clear only once saved, so a failed save keeps what was typed.
+      setText('')
+      setKind('note')
+    } catch (e) {
+      toast.error(errorMessage(e))
+    } finally {
+      invalidate('notes')
+    }
   }
 
   const toTask = (n: Note) =>
@@ -118,7 +113,7 @@ export function InboxPage() {
         className="mb-4 rounded-xl border border-line bg-surface p-3"
         onSubmit={(e) => {
           e.preventDefault()
-          capture()
+          void capture()
         }}
       >
         <Textarea
@@ -130,17 +125,17 @@ export function InboxPage() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              capture()
+              void capture()
             }
           }}
           className="border-0 px-1 focus:ring-0"
         />
         <div className="mt-2 flex items-center gap-2">
-          <Select aria-label="Note type" value={kind} onChange={(e) => setKind(e.target.value as NoteKind)} className="h-9 w-32">
+          <Select aria-label="Note type" value={kind} onChange={(e) => setKind(e.target.value as 'note' | 'idea')} className="h-9 w-32">
             <option value="note">Note</option>
             <option value="idea">Idea</option>
-            <option value="link">Link</option>
           </Select>
+          <span className="hidden text-xs text-subtle sm:inline">Web addresses become links automatically</span>
           <Button type="submit" size="sm" className="ml-auto" disabled={!text.trim()}>
             Capture
           </Button>
