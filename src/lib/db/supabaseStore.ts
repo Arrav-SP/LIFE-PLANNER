@@ -24,6 +24,8 @@ function fail(error: PostgrestError | null, fallback: string): never {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Builder = any
 
+const PAGE = 1000
+
 function applyFilters(q: Builder, filters: Filter[] = []): Builder {
   for (const f of filters) {
     switch (f.op) {
@@ -77,19 +79,29 @@ export class SupabaseStore implements DataStore {
   readonly kind = 'supabase' as const
   constructor(private client: SupabaseClient) {}
 
+  /**
+   * Supabase answers at most 1000 rows per request (its default "Max rows"),
+   * so read page by page until a short page. The primary key is the last sort
+   * key so pages never overlap or skip rows.
+   * shortcut: assumes the project's Max rows is at least PAGE; a lower setting ends the read early.
+   */
   async list<T extends TableName>(table: T, query: ListQuery = {}): Promise<Row<T>[]> {
-    let q: Builder = this.client.from(table).select('*')
-    q = applyFilters(q, query.filters)
-    for (const o of query.order ?? []) q = q.order(o.field, { ascending: o.ascending !== false, nullsFirst: false })
-    if (query.limit !== undefined) {
-      const from = query.offset ?? 0
-      q = q.range(from, from + query.limit - 1)
-    } else if (query.offset) {
-      q = q.range(query.offset, query.offset + 999)
+    const order = [...(query.order ?? []), { field: primaryKey(table), ascending: true }]
+    const rows: Row<T>[] = []
+    let from = query.offset ?? 0
+    const end = query.limit !== undefined ? from + query.limit : Infinity
+    while (from < end) {
+      const size = Math.min(PAGE, end - from)
+      let q: Builder = applyFilters(this.client.from(table).select('*'), query.filters)
+      for (const o of order) q = q.order(o.field, { ascending: o.ascending !== false, nullsFirst: false })
+      const { data, error } = await q.range(from, from + size - 1)
+      if (error) fail(error, 'Could not load data.')
+      const page = (data ?? []) as Row<T>[]
+      rows.push(...page)
+      if (page.length < size) break
+      from += size
     }
-    const { data, error } = await q
-    if (error) fail(error, 'Could not load data.')
-    return (data ?? []) as Row<T>[]
+    return rows
   }
 
   async get<T extends TableName>(table: T, id: string): Promise<Row<T> | null> {

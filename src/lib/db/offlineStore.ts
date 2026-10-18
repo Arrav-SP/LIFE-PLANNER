@@ -2,6 +2,7 @@ import { StoreError, type DataStore, type Filter, type Insert, type ListQuery, t
 import type { LocalStore } from './localStore'
 import type { Outbox, QueuedOp } from './outbox'
 import { primaryKey, TABLES, type Row, type TableName } from './types'
+import { uid } from '../utils'
 
 export interface OfflineDeps {
   /** The signed-in user, also when the session can only be read from this device (offline). */
@@ -29,7 +30,6 @@ export interface SyncReport {
   failed: string[]
 }
 
-const PAGE = 1000
 /** After the server couldn't be reached, use this device's copy straight away for this long. */
 const BACKOFF_MS = 30_000
 
@@ -56,6 +56,19 @@ export function isOfflineError(e: unknown): boolean {
 
 function isAuthError(e: unknown): boolean {
   return e instanceof StoreError && ['PGRST301', 'PGRST303', '42501'].includes(e.code ?? '')
+}
+
+/**
+ * The server looked at the change and said no: bad or duplicate data, a missing
+ * link, not allowed, or the row is gone (PGRST116). Anything else (a 5xx, a
+ * project waking from pause) may work later, so the change stays queued.
+ */
+function isRefusal(e: unknown): boolean {
+  return e instanceof StoreError && (e.code === 'PGRST116' || /^(22|23|42|P0)/.test(e.code ?? ''))
+}
+
+function withId<T extends TableName>(table: T, values: Insert<T>): Insert<T> {
+  return primaryKey(table) === 'id' && !(values as { id?: string }).id ? { ...values, id: uid() } : values
 }
 
 function message(e: unknown): string {
@@ -165,16 +178,17 @@ export class OfflineStore implements DataStore {
           await this.apply(op)
           report.sent++
         } catch (e) {
-          if (isOfflineError(e)) {
-            done = false
-            unreachable = true
-            this.unreachableUntil = Date.now() + BACKOFF_MS
-            break
-          }
           if (isAuthError(e) && !refreshed) {
             refreshed = true
             if (await this.deps.refreshAuth()) continue // retry this change with the new token
             done = false
+            break
+          }
+          if (!isRefusal(e)) {
+            // Offline or a temporary server error: keep it and everything after it, try again later.
+            done = false
+            unreachable = true
+            this.unreachableUntil = Date.now() + BACKOFF_MS
             break
           }
           // The server refused it (a duplicate, or the record was deleted elsewhere). Drop it so the rest can go.
@@ -227,12 +241,7 @@ export class OfflineStore implements DataStore {
     const mirror = this.deps.mirror(uid)
     try {
       for (const table of TABLES) {
-        const rows: Row<TableName>[] = []
-        for (let offset = 0; ; offset += PAGE) {
-          const page = await this.srv((r) => r.list(table, { order: [{ field: primaryKey(table) }], limit: PAGE, offset }))
-          rows.push(...page)
-          if (page.length < PAGE) break
-        }
+        const rows = await this.srv((r) => r.list(table))
         // A change queued meanwhile would be hidden by the snapshot; wait for the next refresh.
         if ((await this.deps.outbox.list(uid)).length) return false
         await mirror.replaceTable(table, rows)
@@ -319,13 +328,14 @@ export class OfflineStore implements DataStore {
   async insert<T extends TableName>(table: T, values: Insert<T>): Promise<Row<T>> {
     const s = await this.session()
     if (!s) return this.remote.insert(table, values)
+    // Pick the id here, so a server call that times out but lands late and its queued retry are the same row.
+    const v = withId(table, values)
     return this.write(
-      () => this.remote.insert(table, values),
+      () => this.remote.insert(table, v),
       (row) => s.mirror.putRaw(table, [row]),
       async () => {
-        const row = await s.mirror.insert(table, values)
-        const values2 = primaryKey(table) === 'id' ? { ...values, id: (row as { id: string }).id } : values
-        await this.deps.outbox.add(s.uid, { kind: 'insert', table, values: values2 as Insert<TableName> })
+        const row = await s.mirror.insert(table, v)
+        await this.deps.outbox.add(s.uid, { kind: 'insert', table, values: v as Insert<TableName> })
         return row
       },
     )
@@ -334,16 +344,15 @@ export class OfflineStore implements DataStore {
   async insertMany<T extends TableName>(table: T, values: Insert<T>[]): Promise<Row<T>[]> {
     const s = await this.session()
     if (!s || !values.length) return this.remote.insertMany(table, values)
+    const vs = values.map((v) => withId(table, v))
     return this.write(
-      () => this.remote.insertMany(table, values),
+      () => this.remote.insertMany(table, vs),
       (rows) => s.mirror.putRaw(table, rows),
       async () => {
         const out: Row<T>[] = []
-        for (const v of values) {
-          const row = await s.mirror.insert(table, v)
-          const v2 = primaryKey(table) === 'id' ? { ...v, id: (row as { id: string }).id } : v
-          await this.deps.outbox.add(s.uid, { kind: 'insert', table, values: v2 as Insert<TableName> })
-          out.push(row)
+        for (const v of vs) {
+          out.push(await s.mirror.insert(table, v))
+          await this.deps.outbox.add(s.uid, { kind: 'insert', table, values: v as Insert<TableName> })
         }
         return out
       },

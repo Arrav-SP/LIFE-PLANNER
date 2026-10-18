@@ -198,6 +198,45 @@ describe('OfflineStore', () => {
     expect((await t.store.list('goals')).map((g) => g.title)).toEqual(['FAT'])
   })
 
+  it('keeps changes queued when the server has a temporary error', async () => {
+    t.goOffline()
+    await t.store.insert('tasks', { title: 'Written on the train' })
+    t.goOnline()
+    // What PostgREST answers (503) while a paused project wakes up: not a refusal.
+    t.server.ctl.refuse = () => new StoreError('Could not connect with the database.', 'PGRST000')
+    expect(await t.store.flush()).toBe(false)
+    expect((await t.outbox.list(USER)).length).toBe(1)
+    t.server.ctl.refuse = null
+    t.store.retryNow()
+    expect(await t.store.flush()).toBe(true)
+    expect((await t.server.db.list('tasks')).map((r) => r.title)).toEqual(['Written on the train'])
+  })
+
+  it('saves one row when a slow insert lands after the app gave up on it', async () => {
+    const server = fakeServer()
+    const mirror = new LocalStore(USER, `cache-slow-${n}`)
+    const store = new OfflineStore(server.remote, {
+      userId: async () => USER,
+      online: () => true,
+      outbox: new IdbOutbox(`outbox-slow-${n}`),
+      mirror: () => mirror,
+      refreshAuth: async () => true,
+      timeoutMs: 50,
+    })
+    const realInsert = server.db.insert.bind(server.db)
+    let landed: Promise<unknown> = Promise.resolve()
+    server.db.insert = ((table: 'tasks', values: object) => {
+      landed = new Promise((r) => setTimeout(r, 100)).then(() => realInsert(table, values))
+      return landed
+    }) as unknown as typeof server.db.insert
+    const task = await store.insert('tasks', { title: 'Slow network' })
+    await landed
+    server.db.insert = realInsert
+    store.retryNow()
+    expect(await store.flush()).toBe(true)
+    expect((await server.db.list('tasks')).map((r) => r.id)).toEqual([task.id])
+  })
+
   it('needs the internet to delete everything', async () => {
     t.goOffline()
     await expect(t.store.clearAll()).rejects.toThrow('Connect to the internet')
