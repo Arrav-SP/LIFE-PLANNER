@@ -79,6 +79,8 @@ export interface NotificationPrefs {
 export interface DashboardPrefs {
   hidden?: string[]
   order?: string[]
+  /** Menu items hidden in Settings → Menu (e.g. '/fitness'). */
+  menu_hidden?: string[]
 }
 
 export interface Category extends BaseRow {

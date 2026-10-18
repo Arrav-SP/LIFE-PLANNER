@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { HubTabs } from '@/components/ui/HubTabs'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useList } from '@/lib/db/hooks'
@@ -67,6 +68,7 @@ export function AnalyticsPage() {
           />
         }
       />
+      <HubTabs hub="review" />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Tasks completed" value={totalDone} sub={dueInRange.length ? `${Math.round((onTime / dueInRange.length) * 100)}% of due tasks on time` : undefined} />
         <Stat label="Study time" value={formatMinutes(totalStudy) || '0m'} sub={`${formatMinutes(Math.round(totalStudy / n)) || '0m'} a day on average`} />

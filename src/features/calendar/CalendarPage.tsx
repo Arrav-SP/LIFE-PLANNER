@@ -26,14 +26,9 @@ import { useEventActions } from './actions'
 import { EventEditor, type EditorTarget } from './EventEditor'
 import { fromWall, toWall, wallKey } from './wall'
 import { useExternalCalendars } from './useExternalCalendars'
+import { linkTo } from '@/lib/links'
+import { CAL_VIEWS, calView, FC_VIEW, isCalView, type CalView, type FcView } from './views'
 
-type View = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek'
-const VIEWS: { value: View; label: string }[] = [
-  { value: 'dayGridMonth', label: 'Month' },
-  { value: 'timeGridWeek', label: 'Week' },
-  { value: 'timeGridDay', label: 'Day' },
-  { value: 'listWeek', label: 'Agenda' },
-]
 
 function readPref<T>(key: string, fallback: T): T {
   try {
@@ -50,7 +45,13 @@ export function CalendarPage() {
   const [params, setParams] = useSearchParams()
   const cal = useRef<FullCalendar>(null)
   const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  const [view, setView] = useState<View>(() => readPref('lp-cal-view', narrow ? 'listWeek' : 'timeGridWeek'))
+  const [view, setView] = useState<FcView>(() => {
+    const asked = params.get('view')
+    if (isCalView(asked) && asked !== 'day') return FC_VIEW[asked]
+    const saved = readPref<string>('lp-cal-view', narrow ? 'listWeek' : 'timeGridWeek')
+    // An old saved "Day" (FullCalendar's) is now the planner; fall back to Week here.
+    return saved === 'dayGridMonth' || saved === 'listWeek' ? saved : 'timeGridWeek'
+  })
   const [range, setRange] = useState<{ start: Date; end: Date } | null>(null)
   const [title, setTitle] = useState('')
   const [show, setShow] = useState(() => readPref('lp-cal-show', { tasks: true, blocks: true }))
@@ -195,9 +196,13 @@ export function CalendarPage() {
   const plugins = useMemo(() => [dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin], [])
 
   const api = () => cal.current?.getApi()
-  const changeView = (v: View) => {
-    setView(v)
-    api()?.changeView(v)
+  const changeView = (v: CalView) => {
+    const a = api()
+    if (v === 'day') return setParams({ view: 'day', date: a ? wallKey(a.getDate()) : dateKey(new Date(), tz) })
+    setView(FC_VIEW[v])
+    a?.changeView(FC_VIEW[v])
+    params.set('view', v)
+    setParams(params, { replace: true })
   }
 
   const onDatesSet = useCallback(
@@ -223,7 +228,7 @@ export function CalendarPage() {
       if (inst.recurring) setScopeFor(inst)
       else setEditor({ event: inst.event, instance: inst, scope: 'all' })
     } else if (kind === 'task') setTask(arg.event.extendedProps.inst as TaskInstance)
-    else if (kind === 'block') navigate(`/planner?date=${wallKey(arg.event.start!)}`)
+    else if (kind === 'block') navigate(linkTo.planner(wallKey(arg.event.start!)))
     else if (kind === 'external') toast.info(`From ${arg.event.extendedProps.calendar as string}. Edit it in Google Calendar.`)
   }
 
@@ -269,7 +274,7 @@ export function CalendarPage() {
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <Segmented label="Calendar view" value={view} onChange={changeView} options={VIEWS} />
+        <Segmented label="Calendar view" value={calView(view)} onChange={changeView} options={CAL_VIEWS} />
         <Button onClick={() => setEditor({})}>
           <Plus className="h-4 w-4" aria-hidden /> Event
         </Button>

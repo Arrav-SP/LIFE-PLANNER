@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { HubTabs } from '@/components/ui/HubTabs'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Trophy, AlertTriangle } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
@@ -106,6 +107,7 @@ export function WeeklyReviewPage() {
           </div>
         }
       />
+      <HubTabs hub="review" />
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Tasks done" value={completed.length} />
         <Stat label="Missed" value={missed.length} />
@@ -224,7 +226,7 @@ export function WeeklyReviewPage() {
             ))}
             <div className="flex items-center gap-3">
               <Button type="submit">Save review</Button>
-              <Link to={`/planner?mode=week&date=${addDays(week, 7)}`} className="text-sm font-medium text-accent hover:underline">
+              <Link to={linkTo.planner(addDays(week, 7), 'week')} className="text-sm font-medium text-accent hover:underline">
                 Plan next week
               </Link>
             </div>

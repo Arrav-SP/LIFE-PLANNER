@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { HubTabs } from '@/components/ui/HubTabs'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Archive, BookOpen, CalendarDays, Flag, Pencil, Plus, StickyNote, Target, Trash2 } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
@@ -65,6 +66,7 @@ export function GoalsPage() {
           </Button>
         }
       />
+      <HubTabs hub="goals" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div className={cn(selected && 'hidden lg:block')}>
           <Segmented
@@ -258,7 +260,7 @@ function GoalDetail({ goal, data, tasks, onBack }: { goal: Goal; data: Parameter
               const pp = projectProgress(pr, data.tasks, data.milestones)
               return (
                 <li key={pr.id}>
-                  <Link to={`/projects?project=${pr.id}`} className="group block">
+                  <Link to={linkTo.project(pr.id)} className="group block">
                     <div className="mb-1 flex justify-between gap-2 text-sm">
                       <span className="flex min-w-0 items-center gap-2">
                         <ColorDot color={pr.color} />

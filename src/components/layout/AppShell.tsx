@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { CalendarCheck2, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Search, Sun, X } from 'lucide-react'
+import { CalendarCheck2, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, X } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { NAV, MOBILE_TABS } from './nav'
 import { cn } from '@/lib/utils'
@@ -10,7 +10,13 @@ import { ReminderCenter } from '@/features/reminders/ReminderCenter'
 import { InstallButton } from '@/features/install/InstallButton'
 import { SyncBanner } from '@/features/offline/OfflineSync'
 
-const GROUP_LABEL: Record<string, string> = { main: '', track: 'Track', review: 'Review', system: '' }
+const GROUP_LABEL: Record<string, string> = { main: '', track: 'Track', review: '' }
+
+/** Menu items the user hid in Settings (trackers they don't use). */
+function useMenuHidden(): Set<string> {
+  const { settings } = useSettings()
+  return new Set(settings.dashboard.menu_hidden ?? [])
+}
 
 /** One tap between light and dark. Settings → Appearance still offers "System". */
 function ThemeToggle() {
@@ -28,13 +34,14 @@ function ThemeToggle() {
 const SIDEBAR_KEY = 'lp-sidebar-collapsed'
 
 function SideNav({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
-  const groups = ['main', 'track', 'review', 'system'] as const
+  const groups = ['main', 'track', 'review'] as const
+  const hidden = useMenuHidden()
   return (
     <nav aria-label="Main" className="flex flex-col gap-4">
       {groups.map((g) => (
         <div key={g} className="flex flex-col gap-0.5">
           {GROUP_LABEL[g] && !collapsed && <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">{GROUP_LABEL[g]}</p>}
-          {NAV.filter((n) => n.group === g).map((n) => (
+          {NAV.filter((n) => n.group === g && !hidden.has(n.to)).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -107,13 +114,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         navigate('/search')
       } else if (e.key === 't') navigate('/')
       else if (e.key === 'c') navigate('/calendar')
-      else if (e.key === 'p') navigate('/planner')
+      else if (e.key === 'p') navigate('/calendar?view=day')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [navigate])
 
-  const tabs = NAV.filter((n) => MOBILE_TABS.includes(n.to))
+  const hidden = useMenuHidden()
+  const tabs = NAV.filter((n) => MOBILE_TABS.includes(n.to) && !hidden.has(n.to))
 
   return (
     <div className="min-h-full md:flex">
@@ -162,7 +170,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <SideNav collapsed={collapsed} />
         </div>
-        {!collapsed && <p className="mt-3 truncate px-2 text-xs text-subtle">{mode === 'local' ? 'Local mode · this browser only' : user?.email}</p>}
+        <div className={cn('mt-3 flex items-center gap-1', collapsed ? 'justify-center' : 'pl-2')}>
+          {!collapsed && <p className="min-w-0 flex-1 truncate text-xs text-subtle">{mode === 'local' ? 'Local mode · this browser only' : user?.email}</p>}
+          <NavLink
+            to="/settings"
+            aria-label="Settings"
+            title="Settings"
+            className={({ isActive }) => cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg hover:bg-surface-2 hover:text-fg', isActive ? 'text-accent' : 'text-muted')}
+          >
+            <Settings className="h-4 w-4" aria-hidden />
+          </NavLink>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -180,6 +198,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </header>
         <div className="hidden items-center justify-end gap-1 px-8 pt-4 md:flex">
+          <button aria-label="Search" title="Search (Ctrl K)" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-2" onClick={() => navigate('/search')}>
+            <Search className="h-5 w-5" />
+          </button>
           <ThemeToggle />
           <ReminderCenter />
         </div>
@@ -206,7 +227,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile tab bar */}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
+        style={{ gridTemplateColumns: `repeat(${tabs.length + 1}, minmax(0, 1fr))` }}
       >
         {tabs.map((n) => (
           <NavLink
@@ -236,6 +258,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
             <SideNav onNavigate={() => setMore(false)} />
+            <NavLink to="/settings" onClick={() => setMore(false)} className="mt-4 flex items-center gap-3 rounded-lg border-t border-line px-3 pt-4 text-sm font-medium text-muted hover:text-fg">
+              <Settings className="h-[18px] w-[18px]" aria-hidden /> Settings
+            </NavLink>
           </div>
         </div>
       )}

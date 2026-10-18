@@ -59,7 +59,7 @@ test('events show on the calendar and in the day planner', async ({ page }) => {
   await page.getByLabel('End time').fill('11:30')
   await page.getByRole('button', { name: 'Add event' }).click()
   await expect(page.locator('.fc').getByText('DBMS lab').first()).toBeVisible()
-  await page.goto('/planner')
+  await page.goto('/calendar?view=day')
   await expect(page.getByText('DBMS lab').first()).toBeVisible()
 })
 
@@ -116,7 +116,8 @@ test('notes convert into tasks', async ({ page }) => {
 })
 
 test('pages fit the screen without sideways scrolling', async ({ page }) => {
-  for (const path of ['/', '/tasks', '/calendar', '/planner', '/habits', '/goals', '/projects', '/study', '/fitness', '/inbox', '/analytics', '/review', '/reminders', '/search', '/settings']) {
+  // Every page and tab, plus an old address that now redirects.
+  for (const path of ['/', '/tasks', '/inbox', '/coach', '/calendar', '/calendar?view=day', '/habits', '/goals', '/goals?tab=projects', '/study', '/fitness', '/review', '/review?tab=trends', '/reminders', '/search', '/settings', '/planner']) {
     await page.goto(path)
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
