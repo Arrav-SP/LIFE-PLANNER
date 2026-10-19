@@ -17,6 +17,10 @@ interface AuthState {
   user: AuthUser | null
   signIn(email: string, password: string): Promise<void>
   signUp(email: string, password: string): Promise<{ needsConfirmation: boolean }>
+  /** Leaves for Google's sign-in page; the session arrives when it redirects back. */
+  signInWithGoogle(): Promise<void>
+  /** Signs in with an ID token from Google's own button; `nonce` is the raw value whose hash Google saw. */
+  signInWithGoogleToken(token: string, nonce: string): Promise<void>
   sendReset(email: string): Promise<void>
   updatePassword(password: string): Promise<void>
   signOut(): Promise<void>
@@ -102,6 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
         if (error) throw new Error(friendly(error.message))
         return { needsConfirmation: !data.session }
+      },
+      async signInWithGoogle() {
+        if (!sb) return
+        const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+        if (error) throw new Error(friendly(error.message))
+      },
+      async signInWithGoogleToken(token, nonce) {
+        if (!sb) return
+        const { error } = await sb.auth.signInWithIdToken({ provider: 'google', token, nonce })
+        if (error) throw new Error(friendly(error.message))
       },
       async sendReset(email) {
         if (!sb) return
