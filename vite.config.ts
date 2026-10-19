@@ -22,8 +22,8 @@ export default defineConfig({
         description: 'Tasks, calendar, habits, study, fitness and goals in one place.',
         lang: 'en',
         dir: 'ltr',
-        theme_color: '#0f172a',
-        background_color: '#f7f7f5',
+        theme_color: '#f6f6f3',
+        background_color: '#f6f6f3',
         display: 'standalone',
         display_override: ['standalone', 'minimal-ui'],
         orientation: 'any',
@@ -41,7 +41,7 @@ export default defineConfig({
         // Long-press the home screen icon for these.
         shortcuts: [
           { name: 'Today', url: '/', icons: [{ src: 'pwa-192.png', sizes: '192x192', type: 'image/png' }] },
-          { name: 'Planner', url: '/planner', icons: [{ src: 'pwa-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'Planner', url: '/calendar?view=day', icons: [{ src: 'pwa-192.png', sizes: '192x192', type: 'image/png' }] },
           { name: 'Habits', url: '/habits', icons: [{ src: 'pwa-192.png', sizes: '192x192', type: 'image/png' }] },
           { name: 'Study', url: '/study', icons: [{ src: 'pwa-192.png', sizes: '192x192', type: 'image/png' }] },
         ],

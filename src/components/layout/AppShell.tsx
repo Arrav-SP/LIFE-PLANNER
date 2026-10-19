@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { CalendarCheck2, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, X } from 'lucide-react'
+import { Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, X } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { NAV, MOBILE_TABS } from './nav'
 import { cn } from '@/lib/utils'
+import { Logo } from '@/components/Logo'
 import { useAuth } from '@/auth/AuthProvider'
 import { QuickAddDialog } from '@/features/tasks/QuickAdd'
 import { ReminderCenter } from '@/features/reminders/ReminderCenter'
@@ -131,9 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Desktop sidebar */}
       <aside className={cn('sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-surface py-4 transition-[width] duration-200 md:flex', collapsed ? 'w-16 px-2' : 'w-60 px-3')}>
         <div className={cn('mb-5 flex items-center gap-2', collapsed ? 'flex-col' : 'px-2')}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg">
-            <CalendarCheck2 className="h-4 w-4" aria-hidden />
-          </span>
+          <Logo />
           {!collapsed && <span className="truncate font-semibold">Life Planner</span>}
           <button
             type="button"

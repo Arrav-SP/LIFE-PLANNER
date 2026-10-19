@@ -1,18 +1,41 @@
-import { useState } from 'react'
+import { forwardRef, useState, type InputHTMLAttributes } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CalendarCheck2 } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Field'
 import { useAuth } from './AuthProvider'
 import { errorMessage } from '@/lib/utils'
+import { Logo } from '@/components/Logo'
+import { GoogleSignIn } from './GoogleSignIn'
 
 const schema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
   password: z.string().min(8, 'Use at least 8 characters.'),
 })
 type Values = z.infer<typeof schema>
+
+/** A password input with a button that shows what was typed. */
+const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function PasswordInput(props, ref) {
+  const [shown, setShown] = useState(false)
+  return (
+    <div className="relative">
+      <Input ref={ref} {...props} type={shown ? 'text' : 'password'} className="pr-11" />
+      <button
+        type="button"
+        onClick={() => setShown((s) => !s)}
+        aria-label={shown ? 'Hide password' : 'Show password'}
+        aria-pressed={shown}
+        title={shown ? 'Hide password' : 'Show password'}
+        className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-lg text-muted hover:text-fg"
+      >
+        {shown ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+      </button>
+    </div>
+  )
+})
+
 
 export function LoginPage() {
   const auth = useAuth()
@@ -42,9 +65,7 @@ export function LoginPage() {
     <main className="flex min-h-full items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-2.5">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-fg">
-            <CalendarCheck2 className="h-5 w-5" aria-hidden />
-          </span>
+          <Logo className="h-10 w-10" />
           <div>
             <p className="text-lg font-semibold leading-tight">Life Planner</p>
             <p className="text-sm text-muted">Your day, goals and habits in one place.</p>
@@ -57,7 +78,7 @@ export function LoginPage() {
           </Field>
           {mode !== 'reset' && (
             <Field label="Password" htmlFor="password" error={form.formState.errors.password?.message}>
-              <Input id="password" type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} {...form.register('password')} />
+              <PasswordInput id="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} {...form.register('password')} />
             </Field>
           )}
           {error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">{error}</p>}
@@ -66,6 +87,16 @@ export function LoginPage() {
             {mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
           </Button>
         </form>
+        {mode !== 'reset' && (
+          <>
+            <div className="my-5 flex items-center gap-3 text-xs text-muted" aria-hidden>
+              <span className="h-px flex-1 bg-line" />
+              or
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <GoogleSignIn onError={setError} />
+          </>
+        )}
         <div className="mt-5 flex flex-wrap justify-between gap-2 text-sm">
           {mode === 'signin' ? (
             <>
@@ -103,7 +134,7 @@ export function ResetPasswordPage() {
       >
         <h1 className="text-xl font-semibold">Choose a new password</h1>
         <Field label="New password" htmlFor="newpw" error={error ?? undefined}>
-          <Input id="newpw" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+          <PasswordInput id="newpw" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
         </Field>
         {done ? <p className="text-sm text-success">Password updated. <a className="underline" href="/">Continue</a></p> : <Button type="submit">Update password</Button>}
       </form>
