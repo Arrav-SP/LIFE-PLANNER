@@ -290,7 +290,7 @@ function FocusTimer({ subjects, topics, openSessions }: { subjects: Subject[]; t
       {state ? (
         <div className="flex flex-col items-center gap-4 text-center">
           {pomo && (
-            <p className={cn('text-xs font-semibold uppercase tracking-wide', pomo.phase === 'work' ? 'text-accent' : 'text-success')}>
+            <p className={cn('text-xs font-semibold', pomo.phase === 'work' ? 'text-accent' : 'text-success')}>
               {pomo.phase === 'work' ? `Focus · pomodoro ${pomo.completed + 1}` : 'Break'}
             </p>
           )}

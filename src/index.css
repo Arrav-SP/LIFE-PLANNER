@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 /* Layout: fixed sidebar on desktop, compact top bar + bottom tab bar on phones.
-   Palette: warm paper neutrals with a deep teal accent; ink-dark theme mirrors it. */
+   Palette: warm paper neutrals with a deep teal accent; ink-dark theme mirrors it.
+   Text colours (fg, muted, subtle) all reach 4.5:1 on bg, surface and surface-2. */
 :root {
   --bg: 246 246 243;
   --surface: 255 255 255;
@@ -11,7 +12,7 @@
   --line: 226 226 220;
   --fg: 24 27 31;
   --muted: 92 98 106;
-  --subtle: 140 146 154;
+  --subtle: 96 102 110;
   --accent: 15 118 110;
   --accent-fg: 255 255 255;
   --accent-soft: 214 238 234;
@@ -28,7 +29,7 @@
   --line: 45 50 57;
   --fg: 232 234 237;
   --muted: 160 166 174;
-  --subtle: 115 122 131;
+  --subtle: 132 139 148;
   --accent: 61 199 182;
   --accent-fg: 6 30 27;
   --accent-soft: 22 58 54;

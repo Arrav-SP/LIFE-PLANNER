@@ -3,6 +3,8 @@ import { ACCENTS, accentColors, accentCss, contrast, DARK_BG, type RGB } from '.
 
 const INK: RGB = [24, 27, 31] // index.css --fg in light mode
 const MUTED: RGB = [92, 98, 106] // --muted
+const SUBTLE: RGB = [96, 102, 110] // --subtle
+const DARK_SUBTLE: RGB = [132, 139, 148] // --subtle in dark mode
 
 describe('accents', () => {
   it.each(ACCENTS)('$name is readable in both themes', (a) => {
@@ -10,6 +12,9 @@ describe('accents', () => {
     expect(contrast(light.accent, light.surface2)).toBeGreaterThanOrEqual(4.5) // links on the tinted panels
     expect(contrast(light.fg, light.accent)).toBeGreaterThanOrEqual(4.5) // button text
     expect(contrast(MUTED, light.surface2)).toBeGreaterThanOrEqual(4.5) // secondary text on the tint
+    expect(contrast(SUBTLE, light.surface2)).toBeGreaterThanOrEqual(4.5) // hints and captions on the tint
+    expect(contrast(SUBTLE, light.bg)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(DARK_SUBTLE, DARK_BG)).toBeGreaterThanOrEqual(4.5)
     expect(contrast(INK, light.soft)).toBeGreaterThanOrEqual(4.5) // active menu item
     expect(contrast(dark.accent, DARK_BG)).toBeGreaterThanOrEqual(4.5)
     expect(contrast(dark.fg, dark.accent)).toBeGreaterThanOrEqual(4.5)

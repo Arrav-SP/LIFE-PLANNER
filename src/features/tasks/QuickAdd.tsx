@@ -121,7 +121,7 @@ export function QuickAddDialog({ open, onClose }: { open: boolean; onClose: () =
           </div>
           {parsed && (
             <div className="rounded-lg bg-surface-2 p-3 text-sm" aria-live="polite">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted">
                 <Sparkles className="h-3.5 w-3.5" aria-hidden /> Will be saved as
               </p>
               <p className="font-medium">{parsed.title}</p>
