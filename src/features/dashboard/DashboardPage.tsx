@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, CalendarDays, CheckCircle2, Clock, Flame, Inbox, Plus, Settings2, Target, Sparkles } from 'lucide-react'
+import { AlertTriangle, Flame, Plus, Settings2, Sparkles } from 'lucide-react'
 import { useSettings } from '@/settings/SettingsProvider'
 import { useList } from '@/lib/db/hooks'
 import { gte, isNull, lte } from '@/lib/db/store'
@@ -10,6 +10,7 @@ import { linkTo } from '@/lib/links'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Field'
 import { Badge, ColorDot, EmptyState, ListSkeleton, Panel, ProgressBar } from '@/components/ui/misc'
+import { DayRuler } from './DayRuler'
 import { Dialog } from '@/components/ui/Dialog'
 import { useTaskData } from '@/features/tasks/useTaskData'
 import { expandTasks, overdue, sortInstances, viewInstances, type TaskInstance } from '@/features/tasks/logic'
@@ -84,13 +85,9 @@ export function DashboardPage() {
   const sections: Record<SectionId, JSX.Element> = {
     today: (
       <Panel
-        title={
-          <span className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-accent" aria-hidden /> Today
-          </span>
-        }
+        title="Today"
         action={
-          <Link to="/tasks?view=today" className="text-xs font-medium text-accent hover:underline">
+          <Link to="/tasks?view=today" className="text-xs font-medium text-muted hover:text-fg">
             Open
           </Link>
         }
@@ -108,7 +105,7 @@ export function DashboardPage() {
           <>
             {late.length > 0 && (
               <div className="mb-1">
-                <p className="flex items-center gap-1.5 px-2 pt-1 text-xs font-semibold uppercase tracking-wide text-danger">
+                <p className="flex items-center gap-1.5 px-2 pt-1 text-xs font-semibold text-danger">
                   <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> Overdue · {late.length}
                 </p>
                 <ul>
@@ -136,13 +133,9 @@ export function DashboardPage() {
     ),
     schedule: (
       <Panel
-        title={
-          <span className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-accent" aria-hidden /> Schedule
-          </span>
-        }
+        title="Schedule"
         action={
-          <Link to={linkTo.planner(today)} className="text-xs font-medium text-accent hover:underline">
+          <Link to={linkTo.planner(today)} className="text-xs font-medium text-muted hover:text-fg">
             Plan day
           </Link>
         }
@@ -178,13 +171,9 @@ export function DashboardPage() {
     habits: <HabitsToday habits={(habits.data ?? []).filter((h) => h.show_on_dashboard)} checkins={checkins.data ?? []} loading={habits.isLoading} />,
     upcoming: (
       <Panel
-        title={
-          <span className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-accent" aria-hidden /> Next 7 days
-          </span>
-        }
+        title="Next 7 days"
         action={
-          <Link to="/tasks?view=upcoming" className="text-xs font-medium text-accent hover:underline">
+          <Link to="/tasks?view=upcoming" className="text-xs font-medium text-muted hover:text-fg">
             Upcoming
           </Link>
         }
@@ -203,13 +192,9 @@ export function DashboardPage() {
     ),
     goals: (
       <Panel
-        title={
-          <span className="flex items-center gap-2">
-            <Target className="h-4 w-4 text-accent" aria-hidden /> Goals
-          </span>
-        }
+        title="Goals"
         action={
-          <Link to="/goals" className="text-xs font-medium text-accent hover:underline">
+          <Link to="/goals" className="text-xs font-medium text-muted hover:text-fg">
             All goals
           </Link>
         }
@@ -252,13 +237,9 @@ export function DashboardPage() {
     ),
     inbox: (
       <Panel
-        title={
-          <span className="flex items-center gap-2">
-            <Inbox className="h-4 w-4 text-accent" aria-hidden /> Unscheduled
-          </span>
-        }
+        title="Unscheduled"
         action={
-          <Link to="/tasks?view=inbox" className="text-xs font-medium text-accent hover:underline">
+          <Link to="/tasks?view=inbox" className="text-xs font-medium text-muted hover:text-fg">
             All undated
           </Link>
         }
@@ -283,11 +264,11 @@ export function DashboardPage() {
     <div className="mx-auto max-w-6xl">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm text-muted">{formatKey(today, 'EEEE, d MMMM')}</p>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-[1.7rem]">
+          <p className="text-sm text-muted">
             {greeting(hour)}
             {settings.display_name ? `, ${settings.display_name}` : ''}
-          </h1>
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-[1.7rem]">{formatKey(today, 'EEEE, d MMMM')}</h1>
           <p className="mt-1 text-sm text-muted">
             {dueToday.length ? `${doneToday} of ${plural(dueToday.length, 'task')} done today` : 'No tasks due today'}
             {plannedMinutes > 0 && ` · ${formatMinutes(plannedMinutes)} planned`}
@@ -304,7 +285,7 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {dueToday.length > 0 && <ProgressBar value={doneToday / dueToday.length} className="mb-6" label="Today's progress" />}
+      <DayRuler items={schedule} />
 
       {/* Two independent columns so tall sections never leave gaps. */}
       <div className="flex flex-col gap-4 lg:hidden">
@@ -388,13 +369,9 @@ function HabitsToday({ habits, checkins, loading }: { habits: import('@/lib/db/t
   const rows = habits.map((h) => ({ h, s: habitStats(h, checkins, today, settings.week_start), c: checkinMap(checkins, h.id).get(today) })).filter((r) => r.s.dueToday || r.s.doneToday)
   return (
     <Panel
-      title={
-        <span className="flex items-center gap-2">
-          <Flame className="h-4 w-4 text-accent" aria-hidden /> Habits
-        </span>
-      }
+      title="Habits"
       action={
-        <Link to="/habits" className="text-xs font-medium text-accent hover:underline">
+        <Link to="/habits" className="text-xs font-medium text-muted hover:text-fg">
           All habits
         </Link>
       }

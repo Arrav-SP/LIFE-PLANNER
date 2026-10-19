@@ -16,14 +16,14 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Panel({ id, title, action, children, className, bodyClassName }: { id?: string; title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; bodyClassName?: string }) {
   return (
-    <section id={id} className={cn('min-w-0 rounded-xl border border-line bg-surface', className)}>
+    <section id={id} className={cn('min-w-0', className)}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+        <div className="mb-2 flex min-h-6 items-center justify-between gap-2 px-1">
           <h2 className="text-sm font-semibold">{title}</h2>
           {action}
         </div>
       )}
-      <div className={cn('p-4', bodyClassName)}>{children}</div>
+      <div className={cn('rounded-xl border border-line bg-surface p-4', bodyClassName)}>{children}</div>
     </section>
   )
 }
@@ -115,7 +115,7 @@ export function Segmented<T extends string>({
 export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <p className="text-xs font-medium text-muted">{label}</p>
       <p className="tabular mt-1 text-2xl font-semibold">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-subtle">{sub}</p>}
     </div>

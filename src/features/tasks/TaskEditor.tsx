@@ -252,7 +252,7 @@ export function TaskEditor({
         </div>
 
         <fieldset className="md:col-span-2">
-          <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Remind me</legend>
+          <legend className="mb-1.5 text-xs font-semibold text-muted">Remind me</legend>
           <div className="flex flex-wrap gap-1.5">
             {REMINDER_CHOICES.map((c) => {
               const on = d.reminder_offsets.includes(c.v)
@@ -273,7 +273,7 @@ export function TaskEditor({
         </fieldset>
 
         <fieldset className="md:col-span-2">
-          <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Checklist</legend>
+          <legend className="mb-1.5 text-xs font-semibold text-muted">Checklist</legend>
           <div className="flex flex-col gap-1.5">
             {d.checklist.map((c, i) => (
               <div key={c.id} className="flex items-center gap-2">
@@ -291,7 +291,7 @@ export function TaskEditor({
         </fieldset>
 
         <fieldset className="md:col-span-2">
-          <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Links</legend>
+          <legend className="mb-1.5 text-xs font-semibold text-muted">Links</legend>
           <div className="flex flex-col gap-1.5">
             {d.links.map((l, i) => (
               <div key={l.id} className="flex items-center gap-2">
@@ -315,7 +315,7 @@ export function TaskEditor({
 
         {task && (
           <div className="md:col-span-2">
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Subtasks</p>
+            <p className="mb-1.5 text-xs font-semibold text-muted">Subtasks</p>
             <ul className="flex flex-col gap-1">
               {(subtasks.data ?? []).map((s) => (
                 <li key={s.id} className="flex items-center gap-2 rounded-lg px-1 py-1">
@@ -360,7 +360,7 @@ export function TaskEditor({
 
         {task && (history.data?.length ?? 0) > 0 && (
           <details className="md:col-span-2">
-            <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+            <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted">
               <History className="h-3.5 w-3.5" /> History
             </summary>
             <ul className="mt-2 flex flex-col gap-1 text-xs text-muted">

@@ -40,7 +40,7 @@ function SideNav({ onNavigate, collapsed = false }: { onNavigate?: () => void; c
     <nav aria-label="Main" className="flex flex-col gap-4">
       {groups.map((g) => (
         <div key={g} className="flex flex-col gap-0.5">
-          {GROUP_LABEL[g] && !collapsed && <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-subtle">{GROUP_LABEL[g]}</p>}
+          {GROUP_LABEL[g] && !collapsed && <p className="px-3 pb-1 text-xs font-medium text-subtle">{GROUP_LABEL[g]}</p>}
           {NAV.filter((n) => n.group === g && !hidden.has(n.to)).map((n) => (
             <NavLink
               key={n.to}
@@ -185,11 +185,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-surface/95 px-4 py-2.5 backdrop-blur md:hidden" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-accent-fg">
-            <CalendarCheck2 className="h-4 w-4" aria-hidden />
-          </span>
-          <span className="flex-1 font-semibold">Life Planner</span>
+        <header className="sticky top-0 z-30 flex items-center justify-end gap-1 border-b border-line bg-surface/95 px-4 py-1.5 backdrop-blur md:hidden" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
           <InstallButton variant="icon" />
           <ThemeToggle />
           <ReminderCenter compact />

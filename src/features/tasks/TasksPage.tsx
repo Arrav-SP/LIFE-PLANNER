@@ -240,7 +240,7 @@ export function TasksPage() {
           {groups.map((g) => (
             <section key={g.key} aria-label={g.label || 'Tasks'}>
               {g.label && (
-                <h2 className={`mb-1 px-2 text-xs font-semibold uppercase tracking-wide ${g.key === '00-overdue' ? 'text-danger' : 'text-muted'}`}>
+                <h2 className={`mb-1 px-2 text-xs font-semibold ${g.key === '00-overdue' ? 'text-danger' : 'text-muted'}`}>
                   {g.label} <span className="font-normal text-subtle">{g.items.length}</span>
                 </h2>
               )}
