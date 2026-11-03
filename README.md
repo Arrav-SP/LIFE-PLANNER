@@ -4,6 +4,16 @@ A personal "life OS" that runs in the browser and installs on your phone as an a
 
 It costs nothing to run. Every service below is used on its free tier, and none of them needs a card.
 
+**Live:** https://life-planner-xxft.vercel.app
+
+![Today: tasks, schedule, habits and goals for the day](docs/screenshots/today.png)
+
+| Calendar (week) | Phone |
+| --- | --- |
+| ![Week view with events and scheduled tasks](docs/screenshots/calendar-week.png) | <img src="docs/screenshots/today-mobile.png" alt="Today on a phone" width="260"> |
+
+<sub>Screenshots use local mode with sample data.</sub>
+
 ## What's inside
 
 | Area | What you can do |
