@@ -24,6 +24,8 @@ test('quick add parses natural language and shows the task today', async ({ page
   await expect(preview).toBeVisible()
   await expect(page.getByText('1h 30m').first()).toBeVisible()
   await page.getByRole('button', { name: 'Save', exact: true }).click()
+  // The dialog closes only once the task is stored; navigating earlier can drop the write.
+  await expect(page.getByLabel('What do you want to add?')).toBeHidden()
   await page.goto('/tasks?view=today')
   await expect(page.getByText('Study OS', { exact: true })).toBeVisible()
   await expect(page.getByText('#fat')).toBeVisible()
@@ -44,6 +46,7 @@ test('habit check-in builds a streak', async ({ page }) => {
   await page.goto('/habits?new=1')
   await page.getByLabel('Name').fill('Gym')
   await page.getByRole('button', { name: 'Add habit' }).click()
+  await expect(page.getByText('Habit added')).toBeVisible()
   await page.goto('/')
   await page.getByRole('checkbox', { name: 'Check in Gym' }).first().click()
   await expect(page.getByRole('checkbox', { name: 'Undo Gym' }).first()).toBeChecked()
@@ -111,6 +114,8 @@ test('notes convert into tasks', async ({ page }) => {
   await page.keyboard.press('Enter')
   await page.getByRole('button', { name: 'Actions for Buy lab record tomorrow' }).click()
   await page.getByRole('menuitem', { name: 'Make it a task' }).click()
+  // A converted note leaves the Inbox tab, so this waits for the task to be stored.
+  await expect(page.getByRole('button', { name: 'Actions for Buy lab record tomorrow' })).toBeHidden()
   await page.goto('/tasks?view=upcoming')
   await expect(page.getByText('Buy lab record')).toBeVisible()
 })
